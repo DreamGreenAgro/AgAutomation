@@ -1,0 +1,8 @@
+[2026-06-08 23:27:19] STABLE: Pump kept OFF. Level: 45%.
+[2026-06-08 23:27:20] ACTIVATED: Pump turned ON. Level: 28%, Weather: Sunny.
+[2026-06-08 23:27:22] SUPPRESSED: Low moisture (25%) bypassed due to Rain.
+[2026-06-08 23:27:23] STABLE: Pump kept OFF. Level: 60%.
+[2026-06-09 01:12:14] STABLE: Pump kept OFF. Level: 45%.
+[2026-06-09 01:12:26] ACTIVATED: Pump turned ON. Level: 28%, Weather: Sunny.
+[2026-06-09 01:12:28] SUPPRESSED: Low moisture (25%) bypassed due to Rain.
+[2026-06-09 01:12:29] STABLE: Pump kept OFF. Level: 60%.

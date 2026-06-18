@@ -1,0 +1,34 @@
+# List of soil moisture readings over an 8-hour shift
+moisture_levels = [45, 42, 38, 31, 28, 25, 40, 55]
+THRESHOLD = 30
+
+print("=== RUNNING AGRICULTURAL ANALYTICS ENGINE ===\n")
+
+# 1. Calculate basic statistics using built-in Python functions
+total_readings = len(moisture_levels)
+highest_moisture = max(moisture_levels)
+lowest_moisture = min(moisture_levels)
+average_moisture = sum(moisture_levels) / total_readings
+
+# 2. Count how many hours the crops were under critical water stress
+stress_hours = 0
+for level in moisture_levels:
+    if level < THRESHOLD:
+        stress_hours += 1
+
+# 3. Print a beautifully formatted report to the terminal
+print("------------ SYSTEM PERFORMANCE REPORT ------------")
+print(f"Total Monitoring Window : {total_readings} Hours")
+print(f"Peak Moisture Recorded  : {highest_moisture}%")
+print(f"Lowest Moisture Recorded: {lowest_moisture}%")
+print(f"Average Field Moisture  : {average_moisture:.1f}%")
+print(f"Time Spent Under Stress : {stress_hours} Hour(s)")
+print("---------------------------------------------------")
+
+# 4. Automatically generate a recommendations string based on the data
+if stress_hours > 0:
+    recommendation = "ACTION REQUIRED: Increase pump run-time during peak drop hours."
+else:
+    recommendation = "OPTIMAL: System maintaining safe moisture thresholds."
+
+print(f"ENGINEERING DIRECTIVE: {recommendation}\n")

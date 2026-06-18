@@ -1,0 +1,8 @@
+[2026-06-08 16:09:20] SYSTEM STABLE: Moisture adequate (45%). Pump off.
+[2026-06-08 16:09:21] SYSTEM STABLE: Moisture adequate (42%). Pump off.
+[2026-06-08 16:09:22] SYSTEM STABLE: Moisture adequate (38%). Pump off.
+[2026-06-08 16:09:23] SYSTEM STABLE: Moisture adequate (31%). Pump off.
+[2026-06-08 16:09:24] ALERT: Moisture low (28%). Activating pump.
+[2026-06-08 16:09:25] ALERT: Moisture low (25%). Activating pump.
+[2026-06-08 16:09:26] SYSTEM STABLE: Moisture adequate (40%). Pump off.
+[2026-06-08 16:09:27] SYSTEM STABLE: Moisture adequate (55%). Pump off.

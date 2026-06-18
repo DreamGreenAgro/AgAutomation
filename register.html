@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Easy Farm Market Upload</title>
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --bg: #f1f8e9;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 15px;
+            color: #333;
+        }
+        .form-container {
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            margin: 0 auto;
+        }
+        h2 {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 1.4rem;
+            border-bottom: 2px solid var(--bg);
+            padding-bottom: 10px;
+        }
+        .section-title {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #555;
+            margin: 20px 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            background-color: #fafafa;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+            outline: none;
+            background-color: white;
+        }
+        textarea {
+            resize: vertical;
+            height: 80px;
+        }
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+        .row .col {
+            flex: 1;
+        }
+        button {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #1b5e20;
+        }
+    </style>
+</head>
+<body>
+
+<div class="form-container">
+    <h2>🧑‍🌾 List Your Harvest</h2>
+    
+    <form action="/submit_farmer" method="POST">
+        
+        <div class="section-title">1. About Your Farm</div>
+        
+        <label for="farm_name">Farm or Enterprise Name</label>
+        <input type="text" id="farm_name" name="farm_name" placeholder="e.g., DGAgroo Farm" required>
+
+        <div class="row">
+            <div class="col">
+                <label for="location_city">Nearest Market Hub/City</label>
+                <select id="location_city" name="location_city" required>
+                    <option value="Chegutu">Chegutu</option>
+                    <option value="Harare">Harare</option>
+                    <option value="Chinhoyi">Chinhoyi</option>
+                    <option value="Marondera">Marondera</option>
+                </select>
+            </div>
+        </div>
+
+        <label for="map_pin">Google Maps Link / Pin (Optional)</label>
+        <input type="text" id="map_pin" name="map_pin" placeholder="Paste link or leave blank">
+
+        <label for="directions_intel">Simple Driving Directions</label>
+        <textarea id="directions_intel" name="directions_intel" placeholder="e.g., Turn right at the Chicken Slice along the highway..."></textarea>
+
+        <div class="section-title">2. Crop Details & How You Want to Sell</div>
+
+        <label for="crop_type">What Crop are you selling?</label>
+        <select id="crop_type" name="crop_type" required>
+            <option value="Onions">Onions</option>
+            <option value="Groundnuts">Groundnuts</option>
+            <option value="Maize">Maize</option>
+            <option value="Potatoes">Potatoes</option>
+            <option value="Tomatoes">Tomatoes</option>
+        </select>
+
+        <div class="row">
+            <div class="col" style="flex: 1.5;">
+                <label for="expected_yield">How much do you have?</label>
+                <input type="number" id="expected_yield" name="expected_yield" placeholder="Amount (e.g., 150)" required step="any">
+            </div>
+            <div class="col" style="flex: 1;">
+                <label for="yield_unit">Unit Measure</label>
+                <select id="yield_unit" name="yield_unit" required>
+                    <option value="Square Meters">Sq Meters (Field)</option>
+                    <option value="Bags">Bags</option>
+                    <option value="Crates">Crates</option>
+                    <option value="Tons">Tons</option>
+                    <option value="Hectares">Hectares</option>
+                </select>
+            </div>
+        </div>
+
+        <label for="sale_condition">How do you want to hand it over?</label>
+        <select id="sale_condition" name="sale_condition" required>
+            <option value="Buy directly from the field (Buyer harvests/pulls)">Buyer must harvest directly from my field</option>
+            <option value="Pre-packed at farm gate (Ready for pickup)">Pre-packed at farm gate (Ready for pickup)</option>
+            <option value="Flexible / Open to negotiate with buyer">Open to negotiate terms with buyer</option>
+        </select>
+
+        <div class="row">
+            <div class="col">
+                <label for="expected_date">Ready Date</label>
+                <input type="date" id="expected_date" name="expected_date" required>
+            </div>
+            <div class="col">
+                <label for="growth_stage">Current Stage</label>
+                <select id="growth_stage" name="growth_stage" required>
+                    <option value="Near Maturity">Near Maturity</option>
+                    <option value="Freshly Planted">Freshly Planted</option>
+                    <option value="Mid-Growth">Mid-Growth</option>
+                    <option value="Harvested & Stored">Harvested & Stored</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit">Broadcast to Buyers 🚀</button>
+    </form>
+</div>
+
+</body>
+</html>

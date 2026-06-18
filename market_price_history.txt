@@ -1,0 +1,5 @@
+
+--- MARKET REPORT RUN AT 2026-06-11 00:07:21 ---
+[NORMAL_TRADE] Region: Harare Hub | Supply: 150 | Demand: 50 | Price: $6.67
+[NORMAL_TRADE] Region: Bulawayo Centre | Supply: 40 | Demand: 140 | Price: $60.0
+[SHORTAGE_CAP] Region: Masvingo Outpost | Supply: 0 | Demand: 30 | Price: $60.0

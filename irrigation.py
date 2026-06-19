@@ -4,7 +4,7 @@ from flask import Flask, jsonify, request, redirect, render_template_string
 
 app = Flask(__name__)
 DB_NAME = "market.db"
-
+# deploy checkpoint
 # --- EMBEDDED FRONTEND UI BLUEPRINTS ---
 DRIVER_FORM_HTML = """
 <!DOCTYPE html>

@@ -4,6 +4,9 @@ from flask import Flask, jsonify, request, redirect, render_template_string
 
 app = Flask(__name__)
 DB_NAME = "market.db"
+@app.route('/')
+def home():
+    return redirect('/register')
 # deploy checkpoint
 # --- EMBEDDED FRONTEND UI BLUEPRINTS ---
 DRIVER_FORM_HTML = """

@@ -1,11 +1,28 @@
 import sqlite3
 import os
-from flask import Flask, jsonify, request, redirect, render_template_string
+from flask import Flask, jsonify, request, redirect, render_template_string, send_from_directory
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder='static')
 DB_NAME = "market.db"
 
-# Global CSS and Header Template to keep branding identical across all pages
+# Configure secure file uploads
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure the upload directory exists locally/on the server
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Serve uploaded files publicly so buyers/admin can view them
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# Global CSS and Header Template
 COMMON_STYLE = """
 <style>
     :root { 
@@ -44,51 +61,27 @@ COMMON_STYLE = """
         box-sizing: border-box;
     }
     
-    /* Branding Header Area configured for your custom logo */
-    .brand-header {
-        text-align: center;
-        margin-bottom: 25px;
-    }
+    .brand-header { text-align: center; margin-bottom: 25px; }
     .brand-logo-container {
-        width: 110px;
-        height: 110px;
-        background-color: #0b0c10;
-        border-radius: 20px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 12px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        border: 2px solid #2e7d32;
-        overflow: hidden;
-        padding: 5px;
+        width: 110px; height: 110px; background-color: #0b0c10; border-radius: 20px;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
     }
-    .brand-logo-container img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-    }
-    .brand-title {
-        font-size: 1.8rem;
-        font-weight: 800;
-        color: var(--text);
-        margin: 0;
-        letter-spacing: -0.5px;
-    }
-    .brand-subtitle {
-        font-size: 0.95rem;
-        color: #546e7a;
-        margin: 5px 0 0 0;
-    }
+    .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; }
+    .brand-title { font-size: 1.8rem; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.5px; }
+    .brand-subtitle { font-size: 0.95rem; color: #546e7a; margin: 5px 0 0 0; }
 
     h2 { font-size: 1.4rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; text-align: center; }
     label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: #37474f; text-align: left; }
+    
     input, select, textarea { 
         width: 100%; padding: 12px; margin-bottom: 18px; 
         border: 1px solid #cfd8dc; border-radius: 8px; 
         box-sizing: border-box; font-size: 1rem; 
         background: #fafafa; transition: all 0.2s ease;
     }
+    input[type="file"] { padding: 8px; background: #fff; cursor: pointer; }
     input:focus, select:focus, textarea:focus {
         border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
     }
@@ -101,10 +94,7 @@ COMMON_STYLE = """
     }
     button:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
     
-    .back-btn { 
-        display: inline-flex; align-items: center; margin-bottom: 20px; 
-        color: #546e7a; text-decoration: none; font-size: 0.9rem; font-weight: 600;
-    }
+    .back-btn { display: inline-flex; align-items: center; margin-bottom: 20px; color: #546e7a; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
     .back-btn:hover { color: #263238; }
 </style>
 """
@@ -140,7 +130,7 @@ def home():
         <div class="gateway-container">
             <div class="brand-header">
                 <div class="brand-logo-container">
-                    <img src="/static/logo.webp" alt="Dream Green Agro Logo">
+                    <img src="/static/logo.webp" alt="Dream Green Agro Logo" onerror="this.style.display='none';">
                 </div>
                 <h1 class="brand-title">Dream Green Agro</h1>
                 <p class="brand-subtitle">Connecting ecosystem logistics & agricultural markets</p>
@@ -150,14 +140,14 @@ def home():
                     <div class="icon">🧑‍🌾</div>
                     <div class="option-details">
                         <div class="option-title">Farmer / Seller</div>
-                        <div class="option-desc">Market your dynamic harvest varieties to bulk buyers.</div>
+                        <div class="option-desc">Market your dynamic harvest varieties with photos to bulk buyers.</div>
                     </div>
                 </a>
                 <a href="/register_driver" class="option-card driver">
                     <div class="icon">🚛</div>
                     <div class="option-details">
                         <div class="option-title">Driver / Transporter</div>
-                        <div class="option-desc">Onboard commercial transport assets for regional fulfillment.</div>
+                        <div class="option-desc">Onboard commercial transport assets with vehicle verification photos.</div>
                     </div>
                 </a>
                 <a href="/register_buyer" class="option-card buyer">
@@ -193,7 +183,7 @@ FARMER_FORM_HTML = f"""
     <div class="form-container">
         <a href="/" class="back-btn">← Back to Selection</a>
         <h2 style="color: var(--primary);">🧑‍🌾 Open Market Harvest Listing</h2>
-        <form action="/api/list_harvest" method="POST">
+        <form action="/api/list_harvest" method="POST" enctype="multipart/form-data">
             <label>Farm / Seller Identity</label>
             <input type="text" name="farm_name" placeholder="e.g., Green Valley Estates" required>
             
@@ -217,6 +207,9 @@ FARMER_FORM_HTML = f"""
                     <option value="Litres">Litres</option>
                 </select>
             </div>
+            
+            <label>Upload Produce Photo</label>
+            <input type="file" name="produce_photo" accept="image/*" required>
             
             <label>Batch Details or Quality Grade (Optional)</label>
             <textarea name="details" rows="2" placeholder="e.g., Grade A premium quality, washed..."></textarea>
@@ -245,7 +238,7 @@ DRIVER_FORM_HTML = f"""
     <div class="form-container">
         <a href="/" class="back-btn">← Back to Selection</a>
         <h2 style="color: var(--driver-color);">🚛 Logistics Onboarding</h2>
-        <form action="/api/register_driver" method="POST">
+        <form action="/api/register_driver" method="POST" enctype="multipart/form-data">
             <label>Driver / Enterprise Full Name</label>
             <input type="text" name="driver_name" placeholder="e.g., John Doe" required>
             
@@ -262,6 +255,9 @@ DRIVER_FORM_HTML = f"""
             
             <label>Primary Freight Base City</label>
             <input type="text" name="base_hub" placeholder="e.g., Harare / Chegutu" required>
+            
+            <label>Upload Vehicle Photo</label>
+            <input type="file" name="vehicle_photo" accept="image/*" required>
             
             <button type="submit">Register Fleet Asset</button>
         </form>
@@ -330,19 +326,34 @@ def api_list_harvest():
         details = request.form.get('details', '')
         quantity_str = f"{quantity} {unit}"
         
+        photo_path = ""
+        if 'produce_photo' in request.files:
+            file = request.files['produce_photo']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                unique_filename = f"harvest_{farm_name.replace(' ', '_')}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+                photo_path = f"/uploads/{unique_filename}"
+        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS harvest (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT
+                farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT
             )
         ''')
-        cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details) VALUES (?, ?, ?, ?, ?)',
-                       (farm_name, hub, crop, quantity_str, details))
+        # Simple schema patch if table exists without column
+        try:
+            cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
+        except sqlite3.OperationalError:
+            pass
+            
+        cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)',
+                       (farm_name, hub, crop, quantity_str, details, photo_path))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Harvest successfully listed on the open market!"}), 201
+        return jsonify({"status": "success", "message": "Harvest with photo listed successfully!"}), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -354,19 +365,33 @@ def api_register_driver():
         vehicle_type = request.form.get('vehicle_type')
         base_hub = request.form.get('base_hub')
         
+        photo_path = ""
+        if 'vehicle_photo' in request.files:
+            file = request.files['vehicle_photo']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                unique_filename = f"driver_{driver_name.replace(' ', '_')}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+                photo_path = f"/uploads/{unique_filename}"
+                
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS drivers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT
+                driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT
             )
         ''')
-        cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub) VALUES (?, ?, ?, ?)',
-                       (driver_name, phone, vehicle_type, base_hub))
+        try:
+            cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
+        except sqlite3.OperationalError:
+            pass
+            
+        cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)',
+                       (driver_name, phone, vehicle_type, base_hub, photo_path))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Transporter registered successfully!"}), 201
+        return jsonify({"status": "success", "message": "Transporter registered with vehicle file successfully!"}), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

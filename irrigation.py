@@ -57,7 +57,7 @@ def init_db():
         )
     ''')
     
-    # Structural Safety Check: Add photo_path columns if missing from old files
+    # Structural Safety Check: Add photo_path columns if missing from old database files
     try:
         cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
     except sqlite3.OperationalError:
@@ -254,14 +254,29 @@ BUYER_FORM_HTML = f"""
 
 @app.route('/admin')
 def admin_dashboard():
-    init_db() # Sync schema structure on every render
+    init_db()
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    harvests = cursor.execute('SELECT * FROM harvest ORDER BY id DESC').fetchall()
-    drivers = cursor.execute('SELECT * FROM drivers ORDER BY id DESC').fetchall()
-    buyers = cursor.execute('SELECT * FROM buyers ORDER BY id DESC').fetchall()
+    # Extract entries and convert to clean dictionaries with robust key defaults
+    raw_harvests = cursor.execute('SELECT * FROM harvest ORDER BY id DESC').fetchall()
+    harvests = []
+    for row in raw_harvests:
+        d = dict(row)
+        d['photo_list'] = d.get('photo_path').split(',') if d.get('photo_path') else []
+        harvests.append(d)
+        
+    raw_drivers = cursor.execute('SELECT * FROM drivers ORDER BY id DESC').fetchall()
+    drivers = []
+    for row in raw_drivers:
+        d = dict(row)
+        d['photo_list'] = d.get('photo_path').split(',') if d.get('photo_path') else []
+        drivers.append(d)
+        
+    raw_buyers = cursor.execute('SELECT * FROM buyers ORDER BY id DESC').fetchall()
+    buyers = [dict(row) for row in raw_buyers]
+    
     conn.close()
     
     DASHBOARD_HTML = """
@@ -321,16 +336,16 @@ def admin_dashboard():
                     <tr><th>ID</th><th>Seller/Farm</th><th>Hub</th><th>Produce</th><th>Quantity</th><th>Details</th><th>Photos</th></tr>
                     {% for h in harvests %}
                     <tr>
-                        <td>{{ h.id }}</td>
-                        <td><strong>{{ h.farm_name }}</strong></td>
-                        <td>{{ h.hub }}</td>
-                        <td><span class="badge badge-farmer">{{ h.crop }}</span></td>
-                        <td>{{ h.quantity }}</td>
-                        <td>{{ h.details }}</td>
+                        <td>{{ h['id'] }}</td>
+                        <td><strong>{{ h['farm_name'] }}</strong></td>
+                        <td>{{ h['hub'] }}</td>
+                        <td><span class="badge badge-farmer">{{ h['crop'] }}</span></td>
+                        <td>{{ h['quantity'] }}</td>
+                        <td>{{ h['details'] }}</td>
                         <td>
                             <div class="gallery">
-                                {% if h.photo_path %}
-                                    {% for img in h.photo_path.split(',') %}
+                                {% if h['photo_list'] %}
+                                    {% for img in h['photo_list'] %}
                                         <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
                                     {% endfor %}
                                 {% else %}
@@ -348,15 +363,15 @@ def admin_dashboard():
                     <tr><th>ID</th><th>Transporter Name</th><th>Contact Phone</th><th>Vehicle Class</th><th>Freight Hub</th><th>Vehicle Verification</th></tr>
                     {% for d in drivers %}
                     <tr>
-                        <td>{{ d.id }}</td>
-                        <td><strong>{{ d.driver_name }}</strong></td>
-                        <td>{{ d.phone }}</td>
-                        <td><span class="badge badge-driver">{{ d.vehicle_type }}</span></td>
-                        <td>{{ d.base_hub }}</td>
+                        <td>{{ d['id'] }}</td>
+                        <td><strong>{{ d['driver_name'] }}</strong></td>
+                        <td>{{ d['phone'] }}</td>
+                        <td><span class="badge badge-driver">{{ d['vehicle_type'] }}</span></td>
+                        <td>{{ d['base_hub'] }}</td>
                         <td>
                             <div class="gallery">
-                                {% if d.photo_path %}
-                                    {% for img in d.photo_path.split(',') %}
+                                {% if d['photo_list'] %}
+                                    {% for img in d['photo_list'] %}
                                         <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
                                     {% endfor %}
                                 {% else %}
@@ -374,11 +389,11 @@ def admin_dashboard():
                     <tr><th>ID</th><th>Enterprise Buyer</th><th>Contact Phone</th><th>Target Destination</th><th>Commodity Targets</th></tr>
                     {% for b in buyers %}
                     <tr>
-                        <td>{{ b.id }}</td>
-                        <td><strong>{{ b.buyer_name }}</strong></td>
-                        <td>{{ b.phone }}</td>
-                        <td>{{ b.target_hub }}</td>
-                        <td><span class="badge badge-buyer">{{ b.crop_needed }}</span></td>
+                        <td>{{ b['id'] }}</td>
+                        <td><strong>{{ b['buyer_name'] }}</strong></td>
+                        <td>{{ b['phone'] }}</td>
+                        <td>{{ b['target_hub'] }}</td>
+                        <td><span class="badge badge-buyer">{{ b['crop_needed'] }}</span></td>
                     </tr>
                     {% endfor %}
                 </table>

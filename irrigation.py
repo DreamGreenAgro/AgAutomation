@@ -1,9 +1,10 @@
 import sqlite3
 import os
-from flask import Flask, jsonify, request, redirect, render_template_string, send_from_directory
+from flask import Flask, jsonify, request, redirect, render_template_string, send_from_directory, session
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder='static')
+app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret')
 DB_NAME = "market.db"
 
 # Configure secure file uploads
@@ -24,8 +25,17 @@ def init_db_fresh():
     cursor.execute("DROP TABLE IF EXISTS harvest")
     cursor.execute("DROP TABLE IF EXISTS drivers")
     cursor.execute("DROP TABLE IF EXISTS buyers")
+    cursor.execute("DROP TABLE IF EXISTS users")
     
     # Rebuild database with clear explicit column mappings
+    cursor.execute('''
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT
+        )
+    ''')
     cursor.execute('''
         CREATE TABLE harvest (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +44,8 @@ def init_db_fresh():
             crop TEXT, 
             quantity TEXT, 
             details TEXT, 
-            photo_path TEXT
+            photo_path TEXT,
+            user_id INTEGER
         )
     ''')
     cursor.execute('''
@@ -44,7 +55,8 @@ def init_db_fresh():
             phone TEXT, 
             vehicle_type TEXT, 
             base_hub TEXT, 
-            photo_path TEXT
+            photo_path TEXT,
+            user_id INTEGER
         )
     ''')
     cursor.execute('''
@@ -65,10 +77,87 @@ init_db_fresh()
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Serve uploaded files publicly
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+def get_current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    user = cursor.execute('SELECT id, username, role FROM users WHERE id = ?', (user_id,)).fetchone()
+    conn.close()
+    return user
+
+LOGIN_HTML = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Dream Green Agro</title>
+    {COMMON_STYLE}
+    <style>
+        button {{ background: var(--primary); }}
+        button:hover {{ background: var(--primary-dark); }}
+        .helper-links {{ display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }}
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2 style="color: var(--primary);">🔐 Sign In</h2>
+        <form action="/login" method="POST">
+            <label>Username</label>
+            <input type="text" name="username" placeholder="Username" required>
+            <label>Password</label>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <div class="helper-links">
+            <a href="/signup">Create an account</a>
+            <a href="/">Back to portal</a>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+SIGNUP_HTML = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Dream Green Agro</title>
+    {COMMON_STYLE}
+    <style>
+        button {{ background: var(--primary); }}
+        button:hover {{ background: var(--primary-dark); }}
+        .helper-links {{ display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }}
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2 style="color: var(--primary);">📝 Register Account</h2>
+        <form action="/signup" method="POST">
+            <label>Username</label>
+            <input type="text" name="username" placeholder="Choose a username" required>
+            <label>Password</label>
+            <input type="password" name="password" placeholder="Choose a password" required>
+            <label>Role</label>
+            <select name="role">
+                <option value="user">User</option>
+                <option value="farmer">Farmer</option>
+                <option value="driver">Driver</option>
+                <option value="buyer">Buyer</option>
+            </select>
+            <button type="submit">Create Account</button>
+        </form>
+        <div class="helper-links">
+            <a href="/login">Have an account? Login</a>
+            <a href="/">Back to portal</a>
+        </div>
+    </div>
+</body>
+</html>
+"""
 
 # Global CSS Framework
 COMMON_STYLE = """
@@ -158,9 +247,30 @@ COMMON_STYLE = """
 </style>
 """
 
+# Serve uploaded files publicly
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 @app.route('/')
 def home():
-    CHOICE_PAGE_HTML = f"""
+    current_user = get_current_user()
+    if current_user:
+        user_section = f"""
+            <p style=\"font-size:1rem;color:#37474f;margin-bottom:18px;\">Welcome back, <strong>{current_user['username']}</strong>! Choose a marketplace action or visit the dashboard.</p>
+            <a href=\"/dashboard\" class=\"option-card buyer\">📊 View Dashboard</a>
+            <a href=\"/register\" class=\"option-card farmer\">🧑‍🌾 List Harvest</a>
+            <a href=\"/register_driver\" class=\"option-card driver\">🚛 Register Driver</a>
+            <a href=\"/logout\" class=\"option-card buyer\" style=\"border-color:#e65100;\">🔓 Logout</a>
+        """
+    else:
+        user_section = f"""
+            <p style=\"font-size:1rem;color:#37474f;margin-bottom:18px;\">Please log in or create an account to manage your listings safely.</p>
+            <a href=\"/login\" class=\"option-card farmer\">🔐 Login</a>
+            <a href=\"/signup\" class=\"option-card driver\">📝 Register</a>
+        """
+
+    HOME_PAGE_HTML = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -178,11 +288,11 @@ def home():
             .option-card.farmer:hover {{ border-color: var(--primary); }}
             .option-card.driver:hover {{ border-color: var(--driver-color); }}
             .option-card.buyer:hover {{ border-color: var(--buyer-color); }}
-            
             .icon {{ font-size: 2.2rem; margin-right: 18px; min-width: 45px; text-align: center; }}
             .option-details {{ flex: 1; }}
             .option-title {{ font-weight: 700; font-size: 1.15rem; color: #2c3e50; margin-bottom: 3px; }}
             .option-desc {{ font-size: 0.85rem; color: #7f8c8d; line-height: 1.3; }}
+            .plain-link {{ display: block; margin-top: 18px; color: var(--primary); font-weight: bold; text-decoration: none; text-align:center; }}
         </style>
     </head>
     <body>
@@ -195,34 +305,13 @@ def home():
                 <p class="brand-subtitle">Connecting ecosystem logistics & agricultural markets</p>
             </div>
             <div class="options-grid">
-                <a href="/register" class="option-card farmer">
-                    <div class="icon">🧑‍🌾</div>
-                    <div class="option-details">
-                        <div class="option-title">Farmer / Seller</div>
-                        <div class="option-desc">Market your harvest with photos to bulk buyers.</div>
-                    </div>
-                </a>
-                <a href="/register_driver" class="option-card driver">
-                    <div class="icon">🚛</div>
-                    <div class="option-details">
-                        <div class="option-title">Driver / Transporter</div>
-                        <div class="option-desc">Onboard commercial transport assets with vehicle verification.</div>
-                    </div>
-                </a>
-                <a href="/register_buyer" class="option-card buyer">
-                    <div class="icon">🛒</div>
-                    <div class="option-details">
-                        <div class="option-title">Buyer / Off-taker</div>
-                        <div class="option-desc">Source broad crop distributions and place direct orders.</div>
-                    </div>
-                </a>
-                <a href="/dashboard" style="text-align: center; text-decoration: none; color: var(--primary); font-weight: bold; margin-top: 15px;">📊 View Live Market Ecosystem Dashboard</a>
+                {user_section}
             </div>
         </div>
     </body>
     </html>
     """
-    return render_template_string(CHOICE_PAGE_HTML)
+    return render_template_string(HOME_PAGE_HTML)
 
 FARMER_FORM_HTML = f"""
 <!DOCTYPE html>
@@ -365,16 +454,61 @@ BUYER_FORM_HTML = f"""
 
 @app.route('/dashboard')
 def dashboard():
+    current_user = get_current_user()
+    if not current_user:
+        return redirect('/login')
+
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
     harvests, drivers = [], []
     try: harvests = cursor.execute("SELECT * FROM harvest").fetchall()
     except Exception: pass
     try: drivers = cursor.execute("SELECT * FROM drivers").fetchall()
     except Exception: pass
     conn.close()
+
+    harvest_cards = ""
+    if harvests:
+        for row in harvests:
+            delete_button = ""
+            if row['user_id'] == current_user['id']:
+                delete_button = f"<a href='/api/delete/harvest/{row['id']}' class='back-btn' style='display:inline-block;margin-top:14px;background:#d32f2f;color:#fff;'>🗑️ Delete Listing</a>"
+            harvest_cards += f'''
+                <div class="market-card">
+                    <img class="card-img" src="{row['photo_path'] if row['photo_path'] else '/static/logo.webp'}" alt="Produce" onerror="this.src='/static/logo.webp';">
+                    <div class="card-body">
+                        <span class="badge" style="background: var(--primary);">{row['crop']}</span>
+                        <div class="card-title">{row['farm_name']}</div>
+                        <div class="card-meta">📍 Vol/Hub: {row['quantity']} @ {row['hub']}</div>
+                        <p style="font-size: 0.85rem; color: #555; margin: 0;">{row['details']}</p>
+                        {delete_button}
+                    </div>
+                </div>
+            '''
+    else:
+        harvest_cards = "<p>No crop harvests currently listed.</p>"
+
+    driver_cards = ""
+    if drivers:
+        for row in drivers:
+            delete_button = ""
+            if row['user_id'] == current_user['id']:
+                delete_button = f"<a href='/api/delete/drivers/{row['id']}' class='back-btn' style='display:inline-block;margin-top:14px;background:#d32f2f;color:#fff;'>🗑️ Delete Listing</a>"
+            driver_cards += f'''
+                <div class="market-card">
+                    <img class="card-img" src="{row['photo_path'] if row['photo_path'] else '/static/logo.webp'}" alt="Vehicle" onerror="this.src='/static/logo.webp';">
+                    <div class="card-body">
+                        <span class="badge" style="background: var(--driver-color);">{row['vehicle_type']}</span>
+                        <div class="card-title">{row['driver_name']}</div>
+                        <div class="card-meta">📞 Contact: {row['phone']}</div>
+                        <div class="card-meta" style="margin: 0; font-weight: 600;">📍 Operational Hub: {row['base_hub']}</div>
+                        {delete_button}
+                    </div>
+                </div>
+            '''
+    else:
+        driver_cards = "<p>No haulage vehicle transporters registered yet.</p>"
 
     DASHBOARD_HTML = f"""
     <!DOCTYPE html>
@@ -387,6 +521,8 @@ def dashboard():
             body {{ display: block; padding: 40px 15px; }}
             .dashboard-container {{ max-width: 1100px; margin: auto; }}
             h3 {{ color: var(--text); border-bottom: 2px solid #cfd8dc; padding-bottom: 8px; margin-top: 30px; }}
+            .header-actions {{ display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }}
+            .header-actions a {{ text-decoration:none; color:#fff; padding:10px 16px; border-radius:10px; background:#2e7d32; font-weight:700; }}
         </style>
     </head>
     <body>
@@ -399,43 +535,71 @@ def dashboard():
                 <div>
                     <h1 class="brand-title" style="font-size: 1.6rem;">Dream Green Agro</h1>
                     <p class="brand-subtitle">Live Open Supply Chain Matrix</p>
+                    <div class="header-actions">
+                        <span style="font-weight:700;color:#37474f;">Signed in as {current_user['username']}</span>
+                        <a href="/register">List Harvest</a>
+                        <a href="/register_driver" style="background:#1565c0;">Register Driver</a>
+                        <a href="/logout" style="background:#e65100;">Logout</a>
+                    </div>
                 </div>
             </div>
 
             <h3>🧑‍🌾 Active Crop Harvest Offers</h3>
             <div class="market-grid">
-                {"".join([f'''
-                <div class="market-card">
-                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Produce" onerror="this.src='/static/logo.webp';">
-                    <div class="card-body">
-                        <span class="badge" style="background: var(--primary);">{row['crop']}</span>
-                        <div class="card-title">{row['farm_name']}</div>
-                        <div class="card-meta">📍 Vol/Hub: {row['quantity']} @ {row['hub']}</div>
-                        <p style="font-size: 0.85rem; color: #555; margin: 0;">{row['details']}</p>
-                    </div>
-                </div>
-                ''' for row in harvests]) if harvests else "<p>No crop harvests currently listed.</p>"}
+                {harvest_cards}
             </div>
 
             <h3>🚛 Logistical Transit Fleets</h3>
             <div class="market-grid">
-                {"".join([f'''
-                <div class="market-card">
-                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Vehicle" onerror="this.src='/static/logo.webp';">
-                    <div class="card-body">
-                        <span class="badge" style="background: var(--driver-color);">{row['vehicle_type']}</span>
-                        <div class="card-title">{row['driver_name']}</div>
-                        <div class="card-meta">📞 Contact: {row['phone']}</div>
-                        <div class="card-meta" style="margin: 0; font-weight: 600;">📍 Operational Hub: {row['base_hub']}</div>
-                    </div>
-                </div>
-                ''' for row in drivers]) if drivers else "<p>No haulage vehicle transporters registered yet.</p>"}
+                {driver_cards}
             </div>
         </div>
     </body>
     </html>
     """
     return render_template_string(DASHBOARD_HTML)
+
+# Auth routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        user = cursor.execute('SELECT id, username, password FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
+        if user and user['password'] == password:
+            session['user_id'] = user['id']
+            return redirect('/dashboard')
+        return render_template_string(LOGIN_HTML.replace('🔐 Sign In', '🔐 Sign In - Invalid credentials'))
+    return render_template_string(LOGIN_HTML)
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        role = request.form.get('role', 'user')
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        try:
+            cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, password, role))
+            conn.commit()
+            user_id = cursor.lastrowid
+            session['user_id'] = user_id
+            return redirect('/dashboard')
+        except sqlite3.IntegrityError:
+            return render_template_string(SIGNUP_HTML.replace('📝 Register Account', '📝 Register Account - Username taken'))
+        finally:
+            conn.close()
+    return render_template_string(SIGNUP_HTML)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
 
 # Form routes
 @app.route('/register')
@@ -469,9 +633,12 @@ def api_list_harvest():
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
                 photo_path = f"/uploads/{unique_filename}"
                 
+        current_user = get_current_user()
+        if not current_user:
+            return redirect('/login')
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)', (farm_name, hub, crop, quantity_str, details, photo_path))
+        cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)', (farm_name, hub, crop, quantity_str, details, photo_path, current_user['id']))
         conn.commit()
         conn.close()
         return redirect('/dashboard')
@@ -494,13 +661,39 @@ def api_register_driver():
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
                 photo_path = f"/uploads/{unique_filename}"
                 
+        current_user = get_current_user()
+        if not current_user:
+            return redirect('/login')
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)', (driver_name, phone, vehicle_type, base_hub, photo_path))
+        cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?)', (driver_name, phone, vehicle_type, base_hub, photo_path, current_user['id']))
         conn.commit()
         conn.close()
         return redirect('/dashboard')
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/delete/<type>/<int:item_id>')
+def api_delete(type, item_id):
+    current_user = get_current_user()
+    if not current_user:
+        return redirect('/login')
+
+    if type == 'harvest':
+        table = 'harvest'
+    elif type in ('driver', 'drivers'):
+        table = 'drivers'
+    else:
+        return redirect('/dashboard')
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    item = cursor.execute(f'SELECT user_id FROM {table} WHERE id = ?', (item_id,)).fetchone()
+    if item and item['user_id'] == current_user['id']:
+        cursor.execute(f'DELETE FROM {table} WHERE id = ?', (item_id,))
+        conn.commit()
+    conn.close()
+    return redirect('/dashboard')
 
 @app.route('/api/register_buyer', methods=['POST'])
 def api_register_buyer():

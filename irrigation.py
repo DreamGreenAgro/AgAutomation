@@ -20,6 +20,56 @@ def allowed_file(filename):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+def init_db():
+    """Safely initializes tables and handles structural updates seamlessly."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    # Core Table Initializations
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS harvest (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            farm_name TEXT, 
+            hub TEXT, 
+            crop TEXT, 
+            quantity TEXT, 
+            details TEXT, 
+            photo_path TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS drivers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            driver_name TEXT, 
+            phone TEXT, 
+            vehicle_type TEXT, 
+            base_hub TEXT, 
+            photo_path TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS buyers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            buyer_name TEXT, 
+            phone TEXT, 
+            target_hub TEXT, 
+            crop_needed TEXT
+        )
+    ''')
+    
+    # Structural Safety Check: Add photo_path columns if missing from old files
+    try:
+        cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
+    except sqlite3.OperationalError:
+        pass
+        
+    conn.commit()
+    conn.close()
+
 # Global CSS styles
 COMMON_STYLE = """
 <style>
@@ -92,7 +142,7 @@ def home():
                     <div><div style="font-weight:700;">Buyer / Off-taker</div><div style="font-size:0.85rem; color:#7f8c8d;">Source broad crop distributions and place direct orders.</div></div>
                 </a>
             </div>
-            <div style="margin-top: 25px; font-size: 0.85rem;">
+            <div style="margin-top: 25px; font-size: 0.85rem; text-align: center;">
                 <a href="/admin" style="color: #546e7a; text-decoration: none; font-weight: 600;">📊 Open Operations Dashboard</a>
             </div>
         </div>
@@ -204,20 +254,10 @@ BUYER_FORM_HTML = f"""
 
 @app.route('/admin')
 def admin_dashboard():
+    init_db() # Sync schema structure on every render
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
-    # Safely build tables
-    cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
-    
-    # Apply column updates if existing tables from prior runs don't match
-    try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
-    except sqlite3.OperationalError: pass
-    try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
-    except sqlite3.OperationalError: pass
     
     harvests = cursor.execute('SELECT * FROM harvest ORDER BY id DESC').fetchall()
     drivers = cursor.execute('SELECT * FROM drivers ORDER BY id DESC').fetchall()
@@ -361,6 +401,7 @@ def serve_buyer_form(): return render_template_string(BUYER_FORM_HTML)
 @app.route('/api/list_harvest', methods=['POST'])
 def api_list_harvest():
     try:
+        init_db()
         farm_name = request.form.get('farm_name')
         hub = request.form.get('hub')
         crop = request.form.get('crop')
@@ -380,20 +421,18 @@ def api_list_harvest():
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY AUTOINCREMENT, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
-        try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
-        except sqlite3.OperationalError: pass
-            
         cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)',
                        (farm_name, hub, crop, quantity, details, photo_paths_str))
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "Successfully listed harvest!"}), 201
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: 
+        return jsonify({"status": "error", "message": f"Database Insertion Error: {str(e)}"}), 500
 
 @app.route('/api/register_driver', methods=['POST'])
 def api_register_driver():
     try:
+        init_db()
         driver_name = request.form.get('driver_name')
         phone = request.form.get('phone')
         vehicle_type = request.form.get('vehicle_type')
@@ -412,32 +451,33 @@ def api_register_driver():
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
-        try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
-        except sqlite3.OperationalError: pass
-            
         cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)',
                        (driver_name, phone, vehicle_type, base_hub, photo_paths_str))
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "Driver profile loaded successfully!"}), 201
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: 
+        return jsonify({"status": "error", "message": f"Database Insertion Error: {str(e)}"}), 500
 
 @app.route('/api/register_buyer', methods=['POST'])
 def api_register_buyer():
     try:
+        init_db()
         buyer_name = request.form.get('buyer_name')
         phone = request.form.get('phone')
         target_hub = request.form.get('target_hub')
         crop_needed = request.form.get('crop_needed')
+        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY AUTOINCREMENT, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
-        cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', (buyer_name, phone, target_hub, crop_needed))
+        cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', 
+                       (buyer_name, phone, target_hub, crop_needed))
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "Buyer added!"}), 201
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: 
+        return jsonify({"status": "error", "message": f"Database Insertion Error: {str(e)}"}), 500
 
 if __name__ == '__main__':
+    init_db()
     app.run(host='0.0.0.0', port=10000)

@@ -37,10 +37,11 @@ COMMON_STYLE = """
         background-size: cover; background-position: center; background-attachment: fixed;
         margin: 0; padding: 15px; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; 
     }
-    .gateway-container, .form-container { 
+    .gateway-container, .form-container, .dashboard-container { 
         max-width: 550px; width: 100%; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         padding: 35px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box;
     }
+    .dashboard-container { max-width: 1000px; }
     .brand-header { text-align: center; margin-bottom: 25px; }
     .brand-logo-container {
         width: 110px; height: 110px; background-color: #0b0c10; border-radius: 20px;
@@ -91,13 +92,15 @@ def home():
                     <div><div style="font-weight:700;">Buyer / Off-taker</div><div style="font-size:0.85rem; color:#7f8c8d;">Source broad crop distributions and place direct orders.</div></div>
                 </a>
             </div>
+            <div style="margin-top: 25px; font-size: 0.85rem;">
+                <a href="/admin" style="color: #546e7a; text-decoration: none; font-weight: 600;">📊 Open Operations Dashboard</a>
+            </div>
         </div>
     </body>
     </html>
     """
     return render_template_string(CHOICE_PAGE_HTML)
 
-# Note the 'multiple' attribute inside the input tag below
 FARMER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -199,6 +202,154 @@ BUYER_FORM_HTML = f"""
 </html>
 """
 
+# ==========================================
+# CENTRAL ADMIN DASHBOARD ROUTER
+# ==========================================
+@app.route('/admin')
+def admin_dashboard():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Ensure tables exist to prevent database crashes on empty setup
+    cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
+    
+    harvests = cursor.execute('SELECT * FROM harvest ORDER BY id DESC').fetchall()
+    drivers = cursor.execute('SELECT * FROM drivers ORDER BY id DESC').fetchall()
+    buyers = cursor.execute('SELECT * FROM buyers ORDER BY id DESC').fetchall()
+    conn.close()
+    
+    DASHBOARD_HTML = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DGA Admin Panel</title>
+        <style>
+            body { font-family: system-ui, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+            .dashboard { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+            .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 15px; margin-bottom: 20px; }
+            h1 { font-size: 1.6rem; color: #2e7d32; margin: 0; }
+            .back-home { text-decoration: none; color: #555; font-weight: 600; font-size: 0.9rem; }
+            
+            /* Section management tabs */
+            .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+            .tab-btn { padding: 10px 18px; border: none; background: #eee; border-radius: 6px; font-weight: bold; cursor: pointer; color: #555; }
+            .tab-btn.active { background: #2e7d32; color: white; }
+            .tab-content { display: none; }
+            .tab-content.active { display: block; }
+            
+            /* Data Display Tables */
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; font-size: 0.92rem; }
+            th, td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+            th { background: #fafafa; font-weight: 700; color: #555; }
+            
+            /* Multi-photo thumbnails */
+            .gallery { display: flex; gap: 5px; flex-wrap: wrap; }
+            .thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; cursor: pointer; }
+            .thumb:hover { transform: scale(1.1); }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: white; }
+            .badge-farmer { background: #2e7d32; }
+            .badge-driver { background: #1565c0; }
+            .badge-buyer { background: #e65100; }
+        </style>
+        <script>
+            function switchTab(tabId, btn) {
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+                btn.classList.add('active');
+            }
+        </script>
+    </head>
+    <body>
+        <div class="dashboard">
+            . <div class="header-bar">
+                <h1>📊 Dream Green Agro Ops Panel</h1>
+                <a href="/" class="back-home">← Back to Public Gateway</a>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('farmers-tab', this)">🧑‍🌾 Harvest Listings ({ len(harvests) })</button>
+                <button class="tab-btn" onclick="switchTab('drivers-tab', this)">🚛 Logistics Fleet ({ len(drivers) })</button>
+                <button class="tab-btn" onclick="switchTab('buyers-tab', this)">🛒 Sourcing Orders ({ len(buyers) })</button>
+            </div>
+            
+            <div id="farmers-tab" class="tab-content active">
+                <table>
+                    <tr><th>ID</th><th>Seller/Farm</th><th>Hub</th><th>Produce</th><th>Quantity</th><th>Details</th><th>Photos</th></tr>
+                    {% for h in harvests %}
+                    <tr>
+                        <td>{{ h['id'] }}</td>
+                        <td><strong>{{ h['farm_name'] }}</strong></td>
+                        <td>{{ h['hub'] }}</td>
+                        <td><span class="badge badge-farmer">{{ h['crop'] }}</span></td>
+                        <td>{{ h['quantity'] }}</td>
+                        <td>{{ h['details'] }}</td>
+                        <td>
+                            <div class="gallery">
+                                {% if h['photo_path'] %}
+                                    {% for img in h['photo_path'].split(',') %}
+                                        <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="color:#aaa;">No file</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            
+            <div id="drivers-tab" class="tab-content">
+                <table>
+                    <tr><th>ID</th><th>Transporter Name</th><th>Contact Phone</th><th>Vehicle Class</th><th>Freight Hub</th><th>Vehicle Verification</th></tr>
+                    {% for d in drivers %}
+                    <tr>
+                        <td>{{ d['id'] }}</td>
+                        <td><strong>{{ d['driver_name'] }}</strong></td>
+                        <td>{{ d['phone'] }}</td>
+                        <td><span class="badge badge-driver">{{ d['vehicle_type'] }}</span></td>
+                        <td>{{ d['base_hub'] }}</td>
+                        <td>
+                            <div class="gallery">
+                                {% if d['photo_path'] %}
+                                    {% for img in d['photo_path'].split(',') %}
+                                        <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="color:#aaa;">No file</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            
+            <div id="buyers-tab" class="tab-content">
+                <table>
+                    <tr><th>ID</th><th>Enterprise Buyer</th><th>Contact Phone</th><th>Target Destination</th><th>Commodity Targets</th></tr>
+                    {% for b in buyers %}
+                    <tr>
+                        <td>{{ b['id'] }}</td>
+                        <td><strong>{{ b['buyer_name'] }}</strong></td>
+                        <td>{{ b['phone'] }}</td>
+                        <td>{{ b['target_hub'] }}</td>
+                        <td><span class="badge badge-buyer">{{ b['crop_needed'] }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return render_template_string(DASHBOARD_HTML, harvests=harvests, drivers=drivers, buyers=buyers)
+
 @app.route('/register')
 def serve_farmer_form(): return render_template_string(FARMER_FORM_HTML)
 
@@ -218,7 +369,7 @@ def api_list_harvest():
         details = request.form.get('details', '')
         
         saved_paths = []
-        files = request.files.getlist('produce_photos') # Grab list of multiple photos
+        files = request.files.getlist('produce_photos')
         for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
@@ -243,7 +394,7 @@ def api_list_harvest():
                        (farm_name, hub, crop, quantity, details, photo_paths_str))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": f"Successfully listed harvest with {len(saved_paths)} images!"}), 201
+        return jsonify({"status": "success", "message": "Successfully listed harvest!"}), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -281,7 +432,7 @@ def api_register_driver():
                        (driver_name, phone, vehicle_type, base_hub, photo_paths_str))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": f"Driver profile loaded with {len(saved_paths)} truck files!"}), 201
+        return jsonify({"status": "success", "message": "Driver profile loaded successfully!"}), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

@@ -6,71 +6,23 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__, static_folder='static')
 DB_NAME = "market.db"
 
-# Configure file uploads
+# Configure secure file uploads
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Serve uploaded files publicly
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-def init_db():
-    """Safely initializes tables and handles structural updates seamlessly."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Core Table Initializations
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS harvest (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            farm_name TEXT, 
-            hub TEXT, 
-            crop TEXT, 
-            quantity TEXT, 
-            details TEXT, 
-            photo_path TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS drivers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            driver_name TEXT, 
-            phone TEXT, 
-            vehicle_type TEXT, 
-            base_hub TEXT, 
-            photo_path TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS buyers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            buyer_name TEXT, 
-            phone TEXT, 
-            target_hub TEXT, 
-            crop_needed TEXT
-        )
-    ''')
-    
-    # Structural Safety Check: Add photo_path columns if missing from old database files
-    try:
-        cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
-    except sqlite3.OperationalError:
-        pass
-        
-    conn.commit()
-    conn.close()
-
-# Global CSS styles
+# Global CSS Framework
 COMMON_STYLE = """
 <style>
     :root { 
@@ -80,36 +32,87 @@ COMMON_STYLE = """
         --buyer-color: #e65100;
         --text: #2c3e50; 
     }
+    
     body { 
         font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
         background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), 
                     url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1000&auto=format&fit=crop');
-        background-size: cover; background-position: center; background-attachment: fixed;
-        margin: 0; padding: 15px; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; 
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        margin: 0; 
+        padding: 15px; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        min-height: 100vh; 
+        box-sizing: border-box; 
     }
+    
     .gateway-container, .form-container, .dashboard-container { 
-        max-width: 550px; width: 100%; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-        padding: 35px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box;
+        max-width: 600px; 
+        width: 100%; 
+        background: rgba(255, 255, 255, 0.94); 
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 35px 25px; 
+        border-radius: 20px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25); 
+        box-sizing: border-box;
     }
+    
     .dashboard-container { max-width: 1000px; }
+    
     .brand-header { text-align: center; margin-bottom: 25px; }
     .brand-logo-container {
         width: 110px; height: 110px; background-color: #0b0c10; border-radius: 20px;
         display: inline-flex; align-items: center; justify-content: center;
-        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
+        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
     }
     .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; }
     .brand-title { font-size: 1.8rem; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.5px; }
     .brand-subtitle { font-size: 0.95rem; color: #546e7a; margin: 5px 0 0 0; }
+
     h2 { font-size: 1.4rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; text-align: center; }
     label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: #37474f; text-align: left; }
-    input, select, textarea { width: 100%; padding: 12px; margin-bottom: 18px; border: 1px solid #cfd8dc; border-radius: 8px; box-sizing: border-box; font-size: 1rem; background: #fafafa; transition: all 0.2s ease; }
+    
+    input, select, textarea { 
+        width: 100%; padding: 12px; margin-bottom: 18px; 
+        border: 1px solid #cfd8dc; border-radius: 8px; 
+        box-sizing: border-box; font-size: 1rem; 
+        background: #fafafa; transition: all 0.2s ease;
+    }
     input[type="file"] { padding: 8px; background: #fff; cursor: pointer; }
-    button { width: 100%; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; color: white; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    input:focus, select:focus, textarea:focus {
+        border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
+    }
+    
+    button { 
+        width: 100%; border: none; padding: 14px; 
+        border-radius: 8px; font-size: 1.05rem; font-weight: bold; 
+        color: white; cursor: pointer; transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
     button:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
+    
     .back-btn { display: inline-flex; align-items: center; margin-bottom: 20px; color: #546e7a; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+    .back-btn:hover { color: #263238; }
+    
+    /* Dashboard Grid Rules */
+    .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 15px; }
+    .market-card { background: white; border-radius: 12px; border: 1px solid #e0e0e0; overflow: hidden; display: flex; flex-direction: column; }
+    .card-img { width: 100%; height: 170px; object-fit: cover; background: #eaeaea; }
+    .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; }
+    .card-title { font-weight: 700; font-size: 1.1rem; margin: 0 0 5px 0; color: var(--text); }
+    .card-meta { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 8px; }
+    .badge { display: inline-block; padding: 4px 8px; font-size: 0.75rem; font-weight: 700; border-radius: 4px; color: white; width: max-content; margin-bottom: 10px; }
 </style>
 """
+
+# ==========================================
+# ROUTES & FRONTEND TEMPLATES
+# ==========================================
 
 @app.route('/')
 def home():
@@ -120,30 +123,56 @@ def home():
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Welcome to Dream Green Agro</title>
         {COMMON_STYLE}
+        <style>
+            .options-grid {{ display: flex; flex-direction: column; gap: 15px; width: 100%; margin-top: 10px; }}
+            .option-card {{ 
+                border: 1px solid #e0e0e0; border-radius: 12px; padding: 18px; 
+                cursor: pointer; text-decoration: none; color: inherit; transition: all 0.2s ease; 
+                display: flex; align-items: center; background: #fff; text-align: left;
+            }}
+            .option-card:hover {{ transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); }}
+            .option-card.farmer:hover {{ border-color: var(--primary); }}
+            .option-card.driver:hover {{ border-color: var(--driver-color); }}
+            .option-card.buyer:hover {{ border-color: var(--buyer-color); }}
+            
+            .icon {{ font-size: 2.2rem; margin-right: 18px; min-width: 45px; text-align: center; }}
+            .option-details {{ flex: 1; }}
+            .option-title {{ font-weight: 700; font-size: 1.15rem; color: #2c3e50; margin-bottom: 3px; }}
+            .option-desc {{ font-size: 0.85rem; color: #7f8c8d; line-height: 1.3; }}
+        </style>
     </head>
     <body>
         <div class="gateway-container">
             <div class="brand-header">
-                <div class="brand-logo-container"><img src="/static/logo.webp" alt="Logo"></div>
+                <div class="brand-logo-container">
+                    <img src="/static/logo.webp" alt="Dream Green Agro Logo">
+                </div>
                 <h1 class="brand-title">Dream Green Agro</h1>
                 <p class="brand-subtitle">Connecting ecosystem logistics & agricultural markets</p>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
-                <a href="/register" style="text-decoration: none; color: inherit; display: flex; padding: 18px; border: 1px solid #e0e0e0; border-radius: 12px; background: #fff;">
-                    <div style="font-size: 2.2rem; margin-right: 18px;">🧑‍🌾</div>
-                    <div><div style="font-weight:700;">Farmer / Seller</div><div style="font-size:0.85rem; color:#7f8c8d;">Market your harvest varieties with multi-photo catalogs.</div></div>
+            <div class="options-grid">
+                <a href="/register" class="option-card farmer">
+                    <div class="icon">🧑‍🌾</div>
+                    <div class="option-details">
+                        <div class="option-title">Farmer / Seller</div>
+                        <div class="option-desc">Market your harvest with photos to bulk buyers.</div>
+                    </div>
                 </a>
-                <a href="/register_driver" style="text-decoration: none; color: inherit; display: flex; padding: 18px; border: 1px solid #e0e0e0; border-radius: 12px; background: #fff;">
-                    <div style="font-size: 2.2rem; margin-right: 18px;">🚛</div>
-                    <div><div style="font-weight:700;">Driver / Transporter</div><div style="font-size:0.85rem; color:#7f8c8d;">Onboard transport assets with vehicle verification photos.</div></div>
+                <a href="/register_driver" class="option-card driver">
+                    <div class="icon">🚛</div>
+                    <div class="option-details">
+                        <div class="option-title">Driver / Transporter</div>
+                        <div class="option-desc">Onboard commercial transport assets with vehicle verification.</div>
+                    </div>
                 </a>
-                <a href="/register_buyer" style="text-decoration: none; color: inherit; display: flex; padding: 18px; border: 1px solid #e0e0e0; border-radius: 12px; background: #fff;">
-                    <div style="font-size: 2.2rem; margin-right: 18px;">🛒</div>
-                    <div><div style="font-weight:700;">Buyer / Off-taker</div><div style="font-size:0.85rem; color:#7f8c8d;">Source broad crop distributions and place direct orders.</div></div>
+                <a href="/register_buyer" class="option-card buyer">
+                    <div class="icon">🛒</div>
+                    <div class="option-details">
+                        <div class="option-title">Buyer / Off-taker</div>
+                        <div class="option-desc">Source broad crop distributions and place direct orders.</div>
+                    </div>
                 </a>
-            </div>
-            <div style="margin-top: 25px; font-size: 0.85rem; text-align: center;">
-                <a href="/admin" style="color: #546e7a; text-decoration: none; font-weight: 600;">📊 Open Operations Dashboard</a>
+                <a href="/dashboard" style="text-align: center; text-decoration: none; color: var(--primary); font-weight: bold; margin-top: 15px;">📊 View Live Market Ecosystem Dashboard</a>
             </div>
         </div>
     </body>
@@ -151,13 +180,21 @@ def home():
     """
     return render_template_string(CHOICE_PAGE_HTML)
 
+
 FARMER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>List Your Harvest</title>
+    <title>List Your Harvest - Dream Green Agro</title>
     {COMMON_STYLE}
+    <style>
+        .unit-group {{ display: flex; gap: 10px; margin-bottom: 0; }}
+        .unit-group input {{ flex: 2; }}
+        .unit-group select {{ flex: 1; }}
+        button {{ background: var(--primary); }}
+        button:hover {{ background: var(--primary-dark); }}
+    </style>
 </head>
 <body>
     <div class="form-container">
@@ -171,31 +208,49 @@ FARMER_FORM_HTML = f"""
             <input type="text" name="hub" placeholder="e.g., Chegutu" required>
             
             <label>Crop / Produce Type</label>
-            <input type="text" name="crop" placeholder="e.g., Butternut, Tomatoes" required>
+            <input type="text" name="crop" placeholder="e.g., Butternut, Tomatoes, White Maize" required>
             
-            <label>Quantity & Metric Unit</label>
-            <input type="text" name="quantity" placeholder="e.g., 500 KG" required>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 2;"><label>Quantity</label></div>
+                <div style="flex: 1;"><label>Metric Unit</label></div>
+            </div>
+            <div class="unit-group">
+                <input type="number" step="any" name="quantity" placeholder="500" required>
+                <select name="unit">
+                    <option value="KG">KG</option>
+                    <option value="Tons">Tons</option>
+                    <option value="Bags (50kg)">Bags (50kg)</option>
+                    <option value="Crates">Crates</option>
+                    <option value="Litres">Litres</option>
+                </select>
+            </div>
             
-            <label>Upload Produce Photos (You can select multiple)</label>
-            <input type="file" name="produce_photos" accept="image/*" multiple required>
+            <label>Upload Produce Photo</label>
+            <input type="file" name="produce_photo" accept="image/*" required>
             
-            <label>Batch Details (Optional)</label>
-            <textarea name="details" rows="2" placeholder="e.g., Grade A quality..."></textarea>
+            <label>Batch Details or Quality Grade (Optional)</label>
+            <textarea name="details" rows="2" placeholder="e.g., Grade A premium quality, washed..."></textarea>
             
-            <button type="submit" style="background: var(--primary);">Publish Produce Listing</button>
+            <button type="submit">Publish Produce Listing</button>
         </form>
     </div>
 </body>
 </html>
 """
 
+
 DRIVER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transporter Onboarding</title>
+    <title>Transporter Onboarding - Dream Green Agro</title>
     {COMMON_STYLE}
+    <style>
+        button {{ background: var(--driver-color); }}
+        button:hover {{ background: #0d47a1; }}
+        input:focus, select:focus {{ border-color: var(--driver-color); box-shadow: 0 0 0 3px rgba(21,101,192,0.15); }}
+    </style>
 </head>
 <body>
     <div class="form-container">
@@ -209,290 +264,226 @@ DRIVER_FORM_HTML = f"""
             <input type="tel" name="phone" placeholder="e.g., +263..." required>
             
             <label>Available Haulage Vehicle Type</label>
-            <input type="text" name="vehicle_type" placeholder="e.g., 5-7 Ton Truck" required>
+            <select name="vehicle_type">
+                <option value="1-3 Ton Truck">1-3 Ton Truck</option>
+                <option value="5-7 Ton Truck">5-7 Ton Truck</option>
+                <option value="10+ Ton Rigid">10+ Ton Rigid</option>
+                <option value="Motorcycle/Utility">Motorcycle/Utility</option>
+            </select>
             
             <label>Primary Freight Base City</label>
-            <input type="text" name="base_hub" placeholder="e.g., Chegutu" required>
+            <input type="text" name="base_hub" placeholder="e.g., Harare / Chegutu" required>
             
-            <label>Upload Vehicle Photos (You can select multiple)</label>
-            <input type="file" name="vehicle_photos" accept="image/*" multiple required>
+            <label>Upload Vehicle Photo</label>
+            <input type="file" name="vehicle_photo" accept="image/*" required>
             
-            <button type="submit" style="background: var(--driver-color);">Register Fleet Asset</button>
+            <button type="submit">Register Fleet Asset</button>
         </form>
     </div>
 </body>
 </html>
 """
+
 
 BUYER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procurement Portal</title>
+    <title>Procurement Portal - Dream Green Agro</title>
     {COMMON_STYLE}
+    <style>
+        button {{ background: var(--buyer-color); }}
+        button:hover {{ background: #bf360c; }}
+        input:focus, select:focus {{ border-color: var(--buyer-color); box-shadow: 0 0 0 3px rgba(230,81,0,0.15); }}
+    </style>
 </head>
 <body>
     <div class="form-container">
         <a href="/" class="back-btn">← Back to Selection</a>
         <h2 style="color: var(--buyer-color);">🛒 Enterprise Buyer Registration</h2>
         <form action="/api/register_buyer" method="POST">
-            <label>Buyer Account Name</label>
-            <input type="text" name="buyer_name" required>
-            <label>Phone Number</label>
-            <input type="tel" name="phone" required>
-            <label>Delivery Destination</label>
-            <input type="text" name="target_hub" required>
+            <label>Buyer / Procurement Account Name</label>
+            <input type="text" name="buyer_name" placeholder="e.g., Fresh Choice Markets" required>
+            
+            <label>Procurement Team Phone Number</label>
+            <input type="tel" name="phone" placeholder="e.g., +263..." required>
+            
+            <label>Intended Sourcing Delivery Destination</label>
+            <input type="text" name="target_hub" placeholder="e.g., Chegutu Hub" required>
+            
             <label>Target Commodities Seeking</label>
-            <input type="text" name="crop_needed" required>
-            <button type="submit" style="background: var(--buyer-color);">Submit Sourcing Target</button>
+            <input type="text" name="crop_needed" placeholder="e.g., Onions, Honey, Potatoes" required>
+            
+            <button type="submit">Submit Sourcing Target</button>
         </form>
     </div>
 </body>
 </html>
 """
 
-@app.route('/admin')
-def admin_dashboard():
-    init_db()
+
+@app.route('/dashboard')
+def dashboard():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Extract entries and convert to clean dictionaries with robust key defaults
-    raw_harvests = cursor.execute('SELECT * FROM harvest ORDER BY id DESC').fetchall()
-    harvests = []
-    for row in raw_harvests:
-        d = dict(row)
-        d['photo_list'] = d.get('photo_path').split(',') if d.get('photo_path') else []
-        harvests.append(d)
-        
-    raw_drivers = cursor.execute('SELECT * FROM drivers ORDER BY id DESC').fetchall()
-    drivers = []
-    for row in raw_drivers:
-        d = dict(row)
-        d['photo_list'] = d.get('photo_path').split(',') if d.get('photo_path') else []
-        drivers.append(d)
-        
-    raw_buyers = cursor.execute('SELECT * FROM buyers ORDER BY id DESC').fetchall()
-    buyers = [dict(row) for row in raw_buyers]
-    
+    harvests, drivers = [], []
+    try: harvests = cursor.execute("SELECT * FROM harvest").fetchall()
+    except Exception: pass
+    try: drivers = cursor.execute("SELECT * FROM drivers").fetchall()
+    except Exception: pass
     conn.close()
-    
-    DASHBOARD_HTML = """
+
+    DASHBOARD_HTML = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>DGA Admin Panel</title>
+        <title>Ecosystem Dashboard - Dream Green Agro</title>
+        {COMMON_STYLE}
         <style>
-            body { font-family: system-ui, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-            .dashboard { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-            .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 15px; margin-bottom: 20px; }
-            h1 { font-size: 1.6rem; color: #2e7d32; margin: 0; }
-            .back-home { text-decoration: none; color: #555; font-weight: 600; font-size: 0.9rem; }
-            
-            .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
-            .tab-btn { padding: 10px 18px; border: none; background: #eee; border-radius: 6px; font-weight: bold; cursor: pointer; color: #555; }
-            .tab-btn.active { background: #2e7d32; color: white; }
-            .tab-content { display: none; }
-            .tab-content.active { display: block; }
-            
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; font-size: 0.92rem; }
-            th, td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
-            th { background: #fafafa; font-weight: 700; color: #555; }
-            
-            .gallery { display: flex; gap: 5px; flex-wrap: wrap; }
-            .thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
-            .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: white; }
-            .badge-farmer { background: #2e7d32; }
-            .badge-driver { background: #1565c0; }
-            .badge-buyer { background: #e65100; }
+            body {{ display: block; padding: 40px 15px; }}
+            .dashboard-container {{ max-width: 1100px; margin: auto; }}
+            h3 {{ color: var(--text); border-bottom: 2px solid #cfd8dc; padding-bottom: 8px; margin-top: 30px; }}
         </style>
-        <script>
-            function switchTab(tabId, btn) {
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.getElementById(tabId).classList.add('active');
-                btn.classList.add('active');
-            }
-        </script>
     </head>
     <body>
-        <div class="dashboard">
-            <div class="header-bar">
-                <h1>📊 Dream Green Agro Ops Panel</h1>
-                <a href="/" class="back-home">← Back to Public Gateway</a>
+        <div class="dashboard-container">
+            <a href="/" class="back-btn">← Back to Portal Selection</a>
+            <div class="brand-header" style="text-align: left; display: flex; align-items: center; gap: 20px;">
+                <div class="brand-logo-container" style="width: 70px; height: 70px; margin-bottom: 0;">
+                    <img src="/static/logo.webp" alt="Logo">
+                </div>
+                <div>
+                    <h1 class="brand-title" style="font-size: 1.6rem;">Dream Green Agro</h1>
+                    <p class="brand-subtitle">Live Open Supply Chain Matrix</p>
+                </div>
             </div>
-            
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('farmers-tab', this)">🧑‍🌾 Harvest Listings ({{ harvests|length }})</button>
-                <button class="tab-btn" onclick="switchTab('drivers-tab', this)">🚛 Logistics Fleet ({{ drivers|length }})</button>
-                <button class="tab-btn" onclick="switchTab('buyers-tab', this)">🛒 Sourcing Orders ({{ buyers|length }})</button>
+
+            <h3>🧑‍🌾 Active Crop Harvest Offers</h3>
+            <div class="market-grid">
+                {"".join([f'''
+                <div class="market-card">
+                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Produce">
+                    <div class="card-body">
+                        <span class="badge" style="background: var(--primary);">{row['crop']}</span>
+                        <div class="card-title">{row['farm_name']}</div>
+                        <div class="card-meta">📍 Vol/Hub: {row['quantity']} @ {row['hub']}</div>
+                        <p style="font-size: 0.85rem; color: #555; margin: 0;">{row['details']}</p>
+                    </div>
+                </div>
+                ''' for row in harvests]) if harvests else "<p>No crop harvests currently listed.</p>"}
             </div>
-            
-            <div id="farmers-tab" class="tab-content active">
-                <table>
-                    <tr><th>ID</th><th>Seller/Farm</th><th>Hub</th><th>Produce</th><th>Quantity</th><th>Details</th><th>Photos</th></tr>
-                    {% for h in harvests %}
-                    <tr>
-                        <td>{{ h['id'] }}</td>
-                        <td><strong>{{ h['farm_name'] }}</strong></td>
-                        <td>{{ h['hub'] }}</td>
-                        <td><span class="badge badge-farmer">{{ h['crop'] }}</span></td>
-                        <td>{{ h['quantity'] }}</td>
-                        <td>{{ h['details'] }}</td>
-                        <td>
-                            <div class="gallery">
-                                {% if h['photo_list'] %}
-                                    {% for img in h['photo_list'] %}
-                                        <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
-                                    {% endfor %}
-                                {% else %}
-                                    <span style="color:#aaa;">No files</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-            
-            <div id="drivers-tab" class="tab-content">
-                <table>
-                    <tr><th>ID</th><th>Transporter Name</th><th>Contact Phone</th><th>Vehicle Class</th><th>Freight Hub</th><th>Vehicle Verification</th></tr>
-                    {% for d in drivers %}
-                    <tr>
-                        <td>{{ d['id'] }}</td>
-                        <td><strong>{{ d['driver_name'] }}</strong></td>
-                        <td>{{ d['phone'] }}</td>
-                        <td><span class="badge badge-driver">{{ d['vehicle_type'] }}</span></td>
-                        <td>{{ d['base_hub'] }}</td>
-                        <td>
-                            <div class="gallery">
-                                {% if d['photo_list'] %}
-                                    {% for img in d['photo_list'] %}
-                                        <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
-                                    {% endfor %}
-                                {% else %}
-                                    <span style="color:#aaa;">No files</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-            
-            <div id="buyers-tab" class="tab-content">
-                <table>
-                    <tr><th>ID</th><th>Enterprise Buyer</th><th>Contact Phone</th><th>Target Destination</th><th>Commodity Targets</th></tr>
-                    {% for b in buyers %}
-                    <tr>
-                        <td>{{ b['id'] }}</td>
-                        <td><strong>{{ b['buyer_name'] }}</strong></td>
-                        <td>{{ b['phone'] }}</td>
-                        <td>{{ b['target_hub'] }}</td>
-                        <td><span class="badge badge-buyer">{{ b['crop_needed'] }}</span></td>
-                    </tr>
-                    {% endfor %}
-                </table>
+
+            <h3>🚛 Logistical Transit Fleets</h3>
+            <div class="market-grid">
+                {"".join([f'''
+                <div class="market-card">
+                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Vehicle">
+                    <div class="card-body">
+                        <span class="badge" style="background: var(--driver-color);">{row['vehicle_type']}</span>
+                        <div class="card-title">{row['driver_name']}</div>
+                        <div class="card-meta">📞 Contact: {row['phone']}</div>
+                        <div class="card-meta" style="margin: 0; font-weight: 600;">📍 Operational Hub: {row['base_hub']}</div>
+                    </div>
+                </div>
+                ''' for row in drivers]) if drivers else "<p>No haulage vehicle transporters registered yet.</p>"}
             </div>
         </div>
     </body>
     </html>
     """
-    return render_template_string(DASHBOARD_HTML, harvests=harvests, drivers=drivers, buyers=buyers)
+    return render_template_string(DASHBOARD_HTML)
 
+
+# Form routes
 @app.route('/register')
 def serve_farmer_form(): return render_template_string(FARMER_FORM_HTML)
-
 @app.route('/register_driver')
 def serve_driver_form(): return render_template_string(DRIVER_FORM_HTML)
-
 @app.route('/register_buyer')
 def serve_buyer_form(): return render_template_string(BUYER_FORM_HTML)
+
+# ==========================================
+# API ENDPOINTS
+# ==========================================
 
 @app.route('/api/list_harvest', methods=['POST'])
 def api_list_harvest():
     try:
-        init_db()
         farm_name = request.form.get('farm_name')
         hub = request.form.get('hub')
         crop = request.form.get('crop')
         quantity = request.form.get('quantity')
+        unit = request.form.get('unit')
         details = request.form.get('details', '')
+        quantity_str = f"{quantity} {unit}"
         
-        saved_paths = []
-        files = request.files.getlist('produce_photos')
-        for idx, file in enumerate(files):
+        photo_path = ""
+        if 'produce_photo' in request.files:
+            file = request.files['produce_photo']
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                unique_filename = f"harvest_{farm_name.replace(' ', '_')}_{idx}_{filename}"
+                unique_filename = f"harvest_{filename}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                saved_paths.append(f"/uploads/{unique_filename}")
+                photo_path = f"/uploads/{unique_filename}"
                 
-        photo_paths_str = ",".join(saved_paths)
-        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)',
-                       (farm_name, hub, crop, quantity, details, photo_paths_str))
+        cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY AUTOINCREMENT, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
+        try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
+        except Exception: pass
+        cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)', (farm_name, hub, crop, quantity_str, details, photo_path))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Successfully listed harvest!"}), 201
-    except Exception as e: 
-        return jsonify({"status": "error", "message": f"Database Insertion Error: {str(e)}"}), 500
+        return redirect('/dashboard')
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/register_driver', methods=['POST'])
 def api_register_driver():
     try:
-        init_db()
         driver_name = request.form.get('driver_name')
         phone = request.form.get('phone')
         vehicle_type = request.form.get('vehicle_type')
         base_hub = request.form.get('base_hub')
         
-        saved_paths = []
-        files = request.files.getlist('vehicle_photos')
-        for idx, file in enumerate(files):
+        photo_path = ""
+        if 'vehicle_photo' in request.files:
+            file = request.files['vehicle_photo']
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                unique_filename = f"driver_{driver_name.replace(' ', '_')}_{idx}_{filename}"
+                unique_filename = f"driver_{filename}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                saved_paths.append(f"/uploads/{unique_filename}")
+                photo_path = f"/uploads/{unique_filename}"
                 
-        photo_paths_str = ",".join(saved_paths)
-        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)',
-                       (driver_name, phone, vehicle_type, base_hub, photo_paths_str))
+        cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
+        try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
+        except Exception: pass
+        cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)', (driver_name, phone, vehicle_type, base_hub, photo_path))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Driver profile loaded successfully!"}), 201
-    except Exception as e: 
-        return jsonify({"status": "error", "message": f"Database Insertion Error: {str(e)}"}), 500
+        return redirect('/dashboard')
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/register_buyer', methods=['POST'])
 def api_register_buyer():
     try:
-        init_db()
         buyer_name = request.form.get('buyer_name')
         phone = request.form.get('phone')
         target_hub = request.form.get('target_hub')
         crop_needed = request.form.get('crop_needed')
-        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', 
-                       (buyer_name, phone, target_hub, crop_needed))
+        cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY AUTOINCREMENT, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
+        cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', (buyer_name, phone, target_hub, crop_needed))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Buyer added!"}), 201
-    except Exception as e: 
-        return jsonify({"status": "error", "message": f"Database Insertion Error: {str(e)}"}), 500
+        return redirect('/')
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    init_db()
     app.run(host='0.0.0.0', port=10000)

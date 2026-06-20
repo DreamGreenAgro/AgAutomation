@@ -7,6 +7,94 @@ app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret')
 DB_NAME = "market.db"
 
+# Global CSS Framework
+COMMON_STYLE = """
+<style>
+    :root { 
+        --primary: #2e7d32; 
+        --primary-dark: #1b5e20;
+        --driver-color: #1565c0; 
+        --buyer-color: #e65100;
+        --text: #2c3e50; 
+    }
+    
+    body { 
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+        background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), 
+                    url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1000&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        margin: 0; 
+        padding: 15px; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        min-height: 100vh; 
+        box-sizing: border-box; 
+    }
+    
+    .gateway-container, .form-container, .dashboard-container { 
+        max-width: 600px; 
+        width: 100%; 
+        background: rgba(255, 255, 255, 0.94); 
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 35px 25px; 
+        border-radius: 20px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25); 
+        box-sizing: border-box;
+    }
+    
+    .dashboard-container { max-width: 1000px; }
+    
+    .brand-header { text-align: center; margin-bottom: 25px; }
+    .brand-logo-container {
+        width: 110px; height: 110px; background-color: #0b0c10; border-radius: 20px;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
+    }
+    .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; }
+    .brand-title { font-size: 1.8rem; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.5px; }
+    .brand-subtitle { font-size: 0.95rem; color: #546e7a; margin: 5px 0 0 0; }
+
+    h2 { font-size: 1.4rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; text-align: center; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: #37474f; text-align: left; }
+    
+    input, select, textarea { 
+        width: 100%; padding: 12px; margin-bottom: 18px; 
+        border: 1px solid #cfd8dc; border-radius: 8px; 
+        box-sizing: border-box; font-size: 1rem; 
+        background: #fafafa; transition: all 0.2s ease;
+    }
+    input[type="file"] { padding: 8px; background: #fff; cursor: pointer; }
+    input:focus, select:focus, textarea:focus {
+        border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
+    }
+    
+    button { 
+        width: 100%; border: none; padding: 14px; 
+        border-radius: 8px; font-size: 1.05rem; font-weight: bold; 
+        color: white; cursor: pointer; transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
+    
+    .back-btn { display: inline-flex; align-items: center; margin-bottom: 20px; color: #546e7a; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+    .back-btn:hover { color: #263238; }
+    
+    /* Dashboard Grid Rules */
+    .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 15px; }
+    .market-card { background: white; border-radius: 12px; border: 1px solid #e0e0e0; overflow: hidden; display: flex; flex-direction: column; }
+    .card-img { width: 100%; height: 170px; object-fit: cover; background: #eaeaea; }
+    .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; }
+    .card-title { font-weight: 700; font-size: 1.1rem; margin: 0 0 5px 0; color: var(--text); }
+    .card-meta { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 8px; }
+    .badge { display: inline-block; padding: 4px 8px; font-size: 0.75rem; font-weight: 700; border-radius: 4px; color: white; width: max-content; margin-bottom: 10px; }
+</style>
+"""
+
 # Configure secure file uploads
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
@@ -157,94 +245,6 @@ SIGNUP_HTML = f"""
     </div>
 </body>
 </html>
-"""
-
-# Global CSS Framework
-COMMON_STYLE = """
-<style>
-    :root { 
-        --primary: #2e7d32; 
-        --primary-dark: #1b5e20;
-        --driver-color: #1565c0; 
-        --buyer-color: #e65100;
-        --text: #2c3e50; 
-    }
-    
-    body { 
-        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
-        background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), 
-                    url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1000&auto=format&fit=crop');
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        margin: 0; 
-        padding: 15px; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        min-height: 100vh; 
-        box-sizing: border-box; 
-    }
-    
-    .gateway-container, .form-container, .dashboard-container { 
-        max-width: 600px; 
-        width: 100%; 
-        background: rgba(255, 255, 255, 0.94); 
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        padding: 35px 25px; 
-        border-radius: 20px; 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25); 
-        box-sizing: border-box;
-    }
-    
-    .dashboard-container { max-width: 1000px; }
-    
-    .brand-header { text-align: center; margin-bottom: 25px; }
-    .brand-logo-container {
-        width: 110px; height: 110px; background-color: #0b0c10; border-radius: 20px;
-        display: inline-flex; align-items: center; justify-content: center;
-        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
-    }
-    .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; }
-    .brand-title { font-size: 1.8rem; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.5px; }
-    .brand-subtitle { font-size: 0.95rem; color: #546e7a; margin: 5px 0 0 0; }
-
-    h2 { font-size: 1.4rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; text-align: center; }
-    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: #37474f; text-align: left; }
-    
-    input, select, textarea { 
-        width: 100%; padding: 12px; margin-bottom: 18px; 
-        border: 1px solid #cfd8dc; border-radius: 8px; 
-        box-sizing: border-box; font-size: 1rem; 
-        background: #fafafa; transition: all 0.2s ease;
-    }
-    input[type="file"] { padding: 8px; background: #fff; cursor: pointer; }
-    input:focus, select:focus, textarea:focus {
-        border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
-    }
-    
-    button { 
-        width: 100%; border: none; padding: 14px; 
-        border-radius: 8px; font-size: 1.05rem; font-weight: bold; 
-        color: white; cursor: pointer; transition: all 0.2s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-    button:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
-    
-    .back-btn { display: inline-flex; align-items: center; margin-bottom: 20px; color: #546e7a; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
-    .back-btn:hover { color: #263238; }
-    
-    /* Dashboard Grid Rules */
-    .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 15px; }
-    .market-card { background: white; border-radius: 12px; border: 1px solid #e0e0e0; overflow: hidden; display: flex; flex-direction: column; }
-    .card-img { width: 100%; height: 170px; object-fit: cover; background: #eaeaea; }
-    .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; }
-    .card-title { font-weight: 700; font-size: 1.1rem; margin: 0 0 5px 0; color: var(--text); }
-    .card-meta { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 8px; }
-    .badge { display: inline-block; padding: 4px 8px; font-size: 0.75rem; font-weight: 700; border-radius: 4px; color: white; width: max-content; margin-bottom: 10px; }
-</style>
 """
 
 # Serve uploaded files publicly

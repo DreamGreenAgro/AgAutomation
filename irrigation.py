@@ -202,19 +202,22 @@ BUYER_FORM_HTML = f"""
 </html>
 """
 
-# ==========================================
-# CENTRAL ADMIN DASHBOARD ROUTER
-# ==========================================
 @app.route('/admin')
 def admin_dashboard():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Ensure tables exist to prevent database crashes on empty setup
+    # Safely build tables
     cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
     cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
     cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
+    
+    # Apply column updates if existing tables from prior runs don't match
+    try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
+    except sqlite3.OperationalError: pass
+    try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
+    except sqlite3.OperationalError: pass
     
     harvests = cursor.execute('SELECT * FROM harvest ORDER BY id DESC').fetchall()
     drivers = cursor.execute('SELECT * FROM drivers ORDER BY id DESC').fetchall()
@@ -234,22 +237,18 @@ def admin_dashboard():
             h1 { font-size: 1.6rem; color: #2e7d32; margin: 0; }
             .back-home { text-decoration: none; color: #555; font-weight: 600; font-size: 0.9rem; }
             
-            /* Section management tabs */
             .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
             .tab-btn { padding: 10px 18px; border: none; background: #eee; border-radius: 6px; font-weight: bold; cursor: pointer; color: #555; }
             .tab-btn.active { background: #2e7d32; color: white; }
             .tab-content { display: none; }
             .tab-content.active { display: block; }
             
-            /* Data Display Tables */
             table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; font-size: 0.92rem; }
             th, td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
             th { background: #fafafa; font-weight: 700; color: #555; }
             
-            /* Multi-photo thumbnails */
             .gallery { display: flex; gap: 5px; flex-wrap: wrap; }
-            .thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; cursor: pointer; }
-            .thumb:hover { transform: scale(1.1); }
+            .thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
             .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: white; }
             .badge-farmer { background: #2e7d32; }
             .badge-driver { background: #1565c0; }
@@ -266,15 +265,15 @@ def admin_dashboard():
     </head>
     <body>
         <div class="dashboard">
-            . <div class="header-bar">
+            <div class="header-bar">
                 <h1>📊 Dream Green Agro Ops Panel</h1>
                 <a href="/" class="back-home">← Back to Public Gateway</a>
             </div>
             
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('farmers-tab', this)">🧑‍🌾 Harvest Listings ({ len(harvests) })</button>
-                <button class="tab-btn" onclick="switchTab('drivers-tab', this)">🚛 Logistics Fleet ({ len(drivers) })</button>
-                <button class="tab-btn" onclick="switchTab('buyers-tab', this)">🛒 Sourcing Orders ({ len(buyers) })</button>
+                <button class="tab-btn active" onclick="switchTab('farmers-tab', this)">🧑‍🌾 Harvest Listings ({{ harvests|length }})</button>
+                <button class="tab-btn" onclick="switchTab('drivers-tab', this)">🚛 Logistics Fleet ({{ drivers|length }})</button>
+                <button class="tab-btn" onclick="switchTab('buyers-tab', this)">🛒 Sourcing Orders ({{ buyers|length }})</button>
             </div>
             
             <div id="farmers-tab" class="tab-content active">
@@ -282,20 +281,20 @@ def admin_dashboard():
                     <tr><th>ID</th><th>Seller/Farm</th><th>Hub</th><th>Produce</th><th>Quantity</th><th>Details</th><th>Photos</th></tr>
                     {% for h in harvests %}
                     <tr>
-                        <td>{{ h['id'] }}</td>
-                        <td><strong>{{ h['farm_name'] }}</strong></td>
-                        <td>{{ h['hub'] }}</td>
-                        <td><span class="badge badge-farmer">{{ h['crop'] }}</span></td>
-                        <td>{{ h['quantity'] }}</td>
-                        <td>{{ h['details'] }}</td>
+                        <td>{{ h.id }}</td>
+                        <td><strong>{{ h.farm_name }}</strong></td>
+                        <td>{{ h.hub }}</td>
+                        <td><span class="badge badge-farmer">{{ h.crop }}</span></td>
+                        <td>{{ h.quantity }}</td>
+                        <td>{{ h.details }}</td>
                         <td>
                             <div class="gallery">
-                                {% if h['photo_path'] %}
-                                    {% for img in h['photo_path'].split(',') %}
+                                {% if h.photo_path %}
+                                    {% for img in h.photo_path.split(',') %}
                                         <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
                                     {% endfor %}
                                 {% else %}
-                                    <span style="color:#aaa;">No file</span>
+                                    <span style="color:#aaa;">No files</span>
                                 {% endif %}
                             </div>
                         </td>
@@ -309,19 +308,19 @@ def admin_dashboard():
                     <tr><th>ID</th><th>Transporter Name</th><th>Contact Phone</th><th>Vehicle Class</th><th>Freight Hub</th><th>Vehicle Verification</th></tr>
                     {% for d in drivers %}
                     <tr>
-                        <td>{{ d['id'] }}</td>
-                        <td><strong>{{ d['driver_name'] }}</strong></td>
-                        <td>{{ d['phone'] }}</td>
-                        <td><span class="badge badge-driver">{{ d['vehicle_type'] }}</span></td>
-                        <td>{{ d['base_hub'] }}</td>
+                        <td>{{ d.id }}</td>
+                        <td><strong>{{ d.driver_name }}</strong></td>
+                        <td>{{ d.phone }}</td>
+                        <td><span class="badge badge-driver">{{ d.vehicle_type }}</span></td>
+                        <td>{{ d.base_hub }}</td>
                         <td>
                             <div class="gallery">
-                                {% if d['photo_path'] %}
-                                    {% for img in d['photo_path'].split(',') %}
+                                {% if d.photo_path %}
+                                    {% for img in d.photo_path.split(',') %}
                                         <a href="{{ img }}" target="_blank"><img src="{{ img }}" class="thumb"></a>
                                     {% endfor %}
                                 {% else %}
-                                    <span style="color:#aaa;">No file</span>
+                                    <span style="color:#aaa;">No files</span>
                                 {% endif %}
                             </div>
                         </td>
@@ -335,11 +334,11 @@ def admin_dashboard():
                     <tr><th>ID</th><th>Enterprise Buyer</th><th>Contact Phone</th><th>Target Destination</th><th>Commodity Targets</th></tr>
                     {% for b in buyers %}
                     <tr>
-                        <td>{{ b['id'] }}</td>
-                        <td><strong>{{ b['buyer_name'] }}</strong></td>
-                        <td>{{ b['phone'] }}</td>
-                        <td>{{ b['target_hub'] }}</td>
-                        <td><span class="badge badge-buyer">{{ b['crop_needed'] }}</span></td>
+                        <td>{{ b.id }}</td>
+                        <td><strong>{{ b.buyer_name }}</strong></td>
+                        <td>{{ b.phone }}</td>
+                        <td>{{ b.target_hub }}</td>
+                        <td><span class="badge badge-buyer">{{ b.crop_needed }}</span></td>
                     </tr>
                     {% endfor %}
                 </table>
@@ -381,12 +380,7 @@ def api_list_harvest():
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS harvest (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT
-            )
-        ''')
+        cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY AUTOINCREMENT, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
         try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
         except sqlite3.OperationalError: pass
             
@@ -395,8 +389,7 @@ def api_list_harvest():
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "Successfully listed harvest!"}), 201
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/register_driver', methods=['POST'])
 def api_register_driver():
@@ -419,12 +412,7 @@ def api_register_driver():
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS drivers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT
-            )
-        ''')
+        cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
         try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
         except sqlite3.OperationalError: pass
             
@@ -433,8 +421,7 @@ def api_register_driver():
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "Driver profile loaded successfully!"}), 201
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/register_buyer', methods=['POST'])
 def api_register_buyer():
@@ -445,6 +432,7 @@ def api_register_buyer():
         crop_needed = request.form.get('crop_needed')
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
+        cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY AUTOINCREMENT, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
         cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', (buyer_name, phone, target_hub, crop_needed))
         conn.commit()
         conn.close()

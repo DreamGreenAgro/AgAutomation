@@ -14,6 +14,54 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# ==========================================
+# AUTOMATIC DATABASE SCHEMA REPAIR RESET
+# ==========================================
+def init_db_fresh():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    # Drop old problematic schemas to eliminate 500 mapping errors
+    cursor.execute("DROP TABLE IF EXISTS harvest")
+    cursor.execute("DROP TABLE IF EXISTS drivers")
+    cursor.execute("DROP TABLE IF EXISTS buyers")
+    
+    # Rebuild database with clear explicit column mappings
+    cursor.execute('''
+        CREATE TABLE harvest (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            farm_name TEXT, 
+            hub TEXT, 
+            crop TEXT, 
+            quantity TEXT, 
+            details TEXT, 
+            photo_path TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE drivers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            driver_name TEXT, 
+            phone TEXT, 
+            vehicle_type TEXT, 
+            base_hub TEXT, 
+            photo_path TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE buyers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            buyer_name TEXT, 
+            phone TEXT, 
+            target_hub TEXT, 
+            crop_needed TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Run the database reset on application startup
+init_db_fresh()
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -110,10 +158,6 @@ COMMON_STYLE = """
 </style>
 """
 
-# ==========================================
-# ROUTES & FRONTEND TEMPLATES
-# ==========================================
-
 @app.route('/')
 def home():
     CHOICE_PAGE_HTML = f"""
@@ -145,7 +189,7 @@ def home():
         <div class="gateway-container">
             <div class="brand-header">
                 <div class="brand-logo-container">
-                    <img src="/static/logo.webp" alt="Dream Green Agro Logo">
+                    <img src="/static/logo.webp" alt="Dream Green Agro Logo" onerror="this.style.display='none';">
                 </div>
                 <h1 class="brand-title">Dream Green Agro</h1>
                 <p class="brand-subtitle">Connecting ecosystem logistics & agricultural markets</p>
@@ -179,7 +223,6 @@ def home():
     </html>
     """
     return render_template_string(CHOICE_PAGE_HTML)
-
 
 FARMER_FORM_HTML = f"""
 <!DOCTYPE html>
@@ -238,7 +281,6 @@ FARMER_FORM_HTML = f"""
 </html>
 """
 
-
 DRIVER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -284,7 +326,6 @@ DRIVER_FORM_HTML = f"""
 </html>
 """
 
-
 BUYER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -322,7 +363,6 @@ BUYER_FORM_HTML = f"""
 </html>
 """
 
-
 @app.route('/dashboard')
 def dashboard():
     conn = sqlite3.connect(DB_NAME)
@@ -354,7 +394,7 @@ def dashboard():
             <a href="/" class="back-btn">← Back to Portal Selection</a>
             <div class="brand-header" style="text-align: left; display: flex; align-items: center; gap: 20px;">
                 <div class="brand-logo-container" style="width: 70px; height: 70px; margin-bottom: 0;">
-                    <img src="/static/logo.webp" alt="Logo">
+                    <img src="/static/logo.webp" alt="Logo" onerror="this.style.display='none';">
                 </div>
                 <div>
                     <h1 class="brand-title" style="font-size: 1.6rem;">Dream Green Agro</h1>
@@ -366,7 +406,7 @@ def dashboard():
             <div class="market-grid">
                 {"".join([f'''
                 <div class="market-card">
-                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Produce">
+                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Produce" onerror="this.src='/static/logo.webp';">
                     <div class="card-body">
                         <span class="badge" style="background: var(--primary);">{row['crop']}</span>
                         <div class="card-title">{row['farm_name']}</div>
@@ -381,7 +421,7 @@ def dashboard():
             <div class="market-grid">
                 {"".join([f'''
                 <div class="market-card">
-                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Vehicle">
+                    <img class="card-img" src="{row['photo_path'] if ('photo_path' in row.keys() and row['photo_path']) else '/static/logo.webp'}" alt="Vehicle" onerror="this.src='/static/logo.webp';">
                     <div class="card-body">
                         <span class="badge" style="background: var(--driver-color);">{row['vehicle_type']}</span>
                         <div class="card-title">{row['driver_name']}</div>
@@ -396,7 +436,6 @@ def dashboard():
     </html>
     """
     return render_template_string(DASHBOARD_HTML)
-
 
 # Form routes
 @app.route('/register')
@@ -432,9 +471,6 @@ def api_list_harvest():
                 
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS harvest (id INTEGER PRIMARY KEY AUTOINCREMENT, farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT)')
-        try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
-        except Exception: pass
         cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)', (farm_name, hub, crop, quantity_str, details, photo_path))
         conn.commit()
         conn.close()
@@ -460,9 +496,6 @@ def api_register_driver():
                 
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT)')
-        try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
-        except Exception: pass
         cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)', (driver_name, phone, vehicle_type, base_hub, photo_path))
         conn.commit()
         conn.close()
@@ -478,7 +511,6 @@ def api_register_buyer():
         crop_needed = request.form.get('crop_needed')
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS buyers (id INTEGER PRIMARY KEY AUTOINCREMENT, buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT)')
         cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', (buyer_name, phone, target_hub, crop_needed))
         conn.commit()
         conn.close()

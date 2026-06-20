@@ -6,23 +6,21 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__, static_folder='static')
 DB_NAME = "market.db"
 
-# Configure secure file uploads
+# Configure file uploads
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure the upload directory exists locally/on the server
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Serve uploaded files publicly so buyers/admin can view them
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# Global CSS and Header Template
+# Global CSS styles
 COMMON_STYLE = """
 <style>
     :root { 
@@ -32,70 +30,33 @@ COMMON_STYLE = """
         --buyer-color: #e65100;
         --text: #2c3e50; 
     }
-    
     body { 
         font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
         background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), 
                     url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1000&auto=format&fit=crop');
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        margin: 0; 
-        padding: 15px; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        min-height: 100vh; 
-        box-sizing: border-box; 
+        background-size: cover; background-position: center; background-attachment: fixed;
+        margin: 0; padding: 15px; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; 
     }
-    
     .gateway-container, .form-container { 
-        max-width: 550px; 
-        width: 100%; 
-        background: rgba(255, 255, 255, 0.94); 
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        padding: 35px 25px; 
-        border-radius: 20px; 
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25); 
-        box-sizing: border-box;
+        max-width: 550px; width: 100%; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        padding: 35px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box;
     }
-    
     .brand-header { text-align: center; margin-bottom: 25px; }
     .brand-logo-container {
         width: 110px; height: 110px; background-color: #0b0c10; border-radius: 20px;
         display: inline-flex; align-items: center; justify-content: center;
-        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
+        margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border: 2px solid #2e7d32; overflow: hidden; padding: 5px;
     }
     .brand-logo-container img { width: 100%; height: 100%; object-fit: contain; }
     .brand-title { font-size: 1.8rem; font-weight: 800; color: var(--text); margin: 0; letter-spacing: -0.5px; }
     .brand-subtitle { font-size: 0.95rem; color: #546e7a; margin: 5px 0 0 0; }
-
     h2 { font-size: 1.4rem; font-weight: 700; margin-top: 0; margin-bottom: 20px; text-align: center; }
     label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: #37474f; text-align: left; }
-    
-    input, select, textarea { 
-        width: 100%; padding: 12px; margin-bottom: 18px; 
-        border: 1px solid #cfd8dc; border-radius: 8px; 
-        box-sizing: border-box; font-size: 1rem; 
-        background: #fafafa; transition: all 0.2s ease;
-    }
+    input, select, textarea { width: 100%; padding: 12px; margin-bottom: 18px; border: 1px solid #cfd8dc; border-radius: 8px; box-sizing: border-box; font-size: 1rem; background: #fafafa; transition: all 0.2s ease; }
     input[type="file"] { padding: 8px; background: #fff; cursor: pointer; }
-    input:focus, select:focus, textarea:focus {
-        border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
-    }
-    
-    button { 
-        width: 100%; border: none; padding: 14px; 
-        border-radius: 8px; font-size: 1.05rem; font-weight: bold; 
-        color: white; cursor: pointer; transition: all 0.2s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
+    button { width: 100%; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; color: white; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
     button:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(0,0,0,0.2); }
-    
     .back-btn { display: inline-flex; align-items: center; margin-bottom: 20px; color: #546e7a; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
-    .back-btn:hover { color: #263238; }
 </style>
 """
 
@@ -108,54 +69,26 @@ def home():
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Welcome to Dream Green Agro</title>
         {COMMON_STYLE}
-        <style>
-            .options-grid {{ display: flex; flex-direction: column; gap: 15px; width: 100%; margin-top: 10px; }}
-            .option-card {{ 
-                border: 1px solid #e0e0e0; border-radius: 12px; padding: 18px; 
-                cursor: pointer; text-decoration: none; color: inherit; transition: all 0.2s ease; 
-                display: flex; align-items: center; background: #fff; text-align: left;
-            }}
-            .option-card:hover {{ transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); }}
-            .option-card.farmer:hover {{ border-color: var(--primary); }}
-            .option-card.driver:hover {{ border-color: var(--driver-color); }}
-            .option-card.buyer:hover {{ border-color: var(--buyer-color); }}
-            
-            .icon {{ font-size: 2.2rem; margin-right: 18px; min-width: 45px; text-align: center; }}
-            .option-details {{ flex: 1; }}
-            .option-title {{ font-weight: 700; font-size: 1.15rem; color: #2c3e50; margin-bottom: 3px; }}
-            .option-desc {{ font-size: 0.85rem; color: #7f8c8d; line-height: 1.3; }}
-        </style>
     </head>
     <body>
         <div class="gateway-container">
             <div class="brand-header">
-                <div class="brand-logo-container">
-                    <img src="/static/logo.webp" alt="Dream Green Agro Logo" onerror="this.style.display='none';">
-                </div>
+                <div class="brand-logo-container"><img src="/static/logo.webp" alt="Logo"></div>
                 <h1 class="brand-title">Dream Green Agro</h1>
                 <p class="brand-subtitle">Connecting ecosystem logistics & agricultural markets</p>
             </div>
-            <div class="options-grid">
-                <a href="/register" class="option-card farmer">
-                    <div class="icon">🧑‍🌾</div>
-                    <div class="option-details">
-                        <div class="option-title">Farmer / Seller</div>
-                        <div class="option-desc">Market your dynamic harvest varieties with photos to bulk buyers.</div>
-                    </div>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+                <a href="/register" style="text-decoration: none; color: inherit; display: flex; padding: 18px; border: 1px solid #e0e0e0; border-radius: 12px; background: #fff;">
+                    <div style="font-size: 2.2rem; margin-right: 18px;">🧑‍🌾</div>
+                    <div><div style="font-weight:700;">Farmer / Seller</div><div style="font-size:0.85rem; color:#7f8c8d;">Market your harvest varieties with multi-photo catalogs.</div></div>
                 </a>
-                <a href="/register_driver" class="option-card driver">
-                    <div class="icon">🚛</div>
-                    <div class="option-details">
-                        <div class="option-title">Driver / Transporter</div>
-                        <div class="option-desc">Onboard commercial transport assets with vehicle verification photos.</div>
-                    </div>
+                <a href="/register_driver" style="text-decoration: none; color: inherit; display: flex; padding: 18px; border: 1px solid #e0e0e0; border-radius: 12px; background: #fff;">
+                    <div style="font-size: 2.2rem; margin-right: 18px;">🚛</div>
+                    <div><div style="font-weight:700;">Driver / Transporter</div><div style="font-size:0.85rem; color:#7f8c8d;">Onboard transport assets with vehicle verification photos.</div></div>
                 </a>
-                <a href="/register_buyer" class="option-card buyer">
-                    <div class="icon">🛒</div>
-                    <div class="option-details">
-                        <div class="option-title">Buyer / Off-taker</div>
-                        <div class="option-desc">Source broad crop distributions and place direct orders.</div>
-                    </div>
+                <a href="/register_buyer" style="text-decoration: none; color: inherit; display: flex; padding: 18px; border: 1px solid #e0e0e0; border-radius: 12px; background: #fff;">
+                    <div style="font-size: 2.2rem; margin-right: 18px;">🛒</div>
+                    <div><div style="font-weight:700;">Buyer / Off-taker</div><div style="font-size:0.85rem; color:#7f8c8d;">Source broad crop distributions and place direct orders.</div></div>
                 </a>
             </div>
         </div>
@@ -164,20 +97,14 @@ def home():
     """
     return render_template_string(CHOICE_PAGE_HTML)
 
+# Note the 'multiple' attribute inside the input tag below
 FARMER_FORM_HTML = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>List Your Harvest - Dream Green Agro</title>
+    <title>List Your Harvest</title>
     {COMMON_STYLE}
-    <style>
-        .unit-group {{ display: flex; gap: 10px; margin-bottom: 0; }}
-        .unit-group input {{ flex: 2; }}
-        .unit-group select {{ flex: 1; }}
-        button {{ background: var(--primary); }}
-        button:hover {{ background: var(--primary-dark); }}
-    </style>
 </head>
 <body>
     <div class="form-container">
@@ -191,30 +118,18 @@ FARMER_FORM_HTML = f"""
             <input type="text" name="hub" placeholder="e.g., Chegutu" required>
             
             <label>Crop / Produce Type</label>
-            <input type="text" name="crop" placeholder="e.g., Butternut, Tomatoes, White Maize" required>
+            <input type="text" name="crop" placeholder="e.g., Butternut, Tomatoes" required>
             
-            <div style="display: flex; gap: 10px;">
-                <div style="flex: 2;"><label>Quantity</label></div>
-                <div style="flex: 1;"><label>Metric Unit</label></div>
-            </div>
-            <div class="unit-group">
-                <input type="number" step="any" name="quantity" placeholder="500" required>
-                <select name="unit">
-                    <option value="KG">KG</option>
-                    <option value="Tons">Tons</option>
-                    <option value="Bags (50kg)">Bags (50kg)</option>
-                    <option value="Crates">Crates</option>
-                    <option value="Litres">Litres</option>
-                </select>
-            </div>
+            <label>Quantity & Metric Unit</label>
+            <input type="text" name="quantity" placeholder="e.g., 500 KG" required>
             
-            <label>Upload Produce Photo</label>
-            <input type="file" name="produce_photo" accept="image/*" required>
+            <label>Upload Produce Photos (You can select multiple)</label>
+            <input type="file" name="produce_photos" accept="image/*" multiple required>
             
-            <label>Batch Details or Quality Grade (Optional)</label>
-            <textarea name="details" rows="2" placeholder="e.g., Grade A premium quality, washed..."></textarea>
+            <label>Batch Details (Optional)</label>
+            <textarea name="details" rows="2" placeholder="e.g., Grade A quality..."></textarea>
             
-            <button type="submit">Publish Produce Listing</button>
+            <button type="submit" style="background: var(--primary);">Publish Produce Listing</button>
         </form>
     </div>
 </body>
@@ -226,13 +141,8 @@ DRIVER_FORM_HTML = f"""
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transporter Onboarding - Dream Green Agro</title>
+    <title>Transporter Onboarding</title>
     {COMMON_STYLE}
-    <style>
-        button {{ background: var(--driver-color); }}
-        button:hover {{ background: #0d47a1; }}
-        input:focus, select:focus {{ border-color: var(--driver-color); box-shadow: 0 0 0 3px rgba(21,101,192,0.15); }}
-    </style>
 </head>
 <body>
     <div class="form-container">
@@ -246,20 +156,15 @@ DRIVER_FORM_HTML = f"""
             <input type="tel" name="phone" placeholder="e.g., +263..." required>
             
             <label>Available Haulage Vehicle Type</label>
-            <select name="vehicle_type">
-                <option value="1-3 Ton Truck">1-3 Ton Truck</option>
-                <option value="5-7 Ton Truck">5-7 Ton Truck</option>
-                <option value="10+ Ton Rigid">10+ Ton Rigid</option>
-                <option value="Motorcycle/Utility">Motorcycle/Utility</option>
-            </select>
+            <input type="text" name="vehicle_type" placeholder="e.g., 5-7 Ton Truck" required>
             
             <label>Primary Freight Base City</label>
-            <input type="text" name="base_hub" placeholder="e.g., Harare / Chegutu" required>
+            <input type="text" name="base_hub" placeholder="e.g., Chegutu" required>
             
-            <label>Upload Vehicle Photo</label>
-            <input type="file" name="vehicle_photo" accept="image/*" required>
+            <label>Upload Vehicle Photos (You can select multiple)</label>
+            <input type="file" name="vehicle_photos" accept="image/*" multiple required>
             
-            <button type="submit">Register Fleet Asset</button>
+            <button type="submit" style="background: var(--driver-color);">Register Fleet Asset</button>
         </form>
     </div>
 </body>
@@ -271,32 +176,23 @@ BUYER_FORM_HTML = f"""
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procurement Portal - Dream Green Agro</title>
+    <title>Procurement Portal</title>
     {COMMON_STYLE}
-    <style>
-        button {{ background: var(--buyer-color); }}
-        button:hover {{ background: #bf360c; }}
-        input:focus, select:focus {{ border-color: var(--buyer-color); box-shadow: 0 0 0 3px rgba(230,81,0,0.15); }}
-    </style>
 </head>
 <body>
     <div class="form-container">
         <a href="/" class="back-btn">← Back to Selection</a>
         <h2 style="color: var(--buyer-color);">🛒 Enterprise Buyer Registration</h2>
         <form action="/api/register_buyer" method="POST">
-            <label>Buyer / Procurement Account Name</label>
-            <input type="text" name="buyer_name" placeholder="e.g., Fresh Choice Markets" required>
-            
-            <label>Procurement Team Phone Number</label>
-            <input type="tel" name="phone" placeholder="e.g., +263..." required>
-            
-            <label>Intended Sourcing Delivery Destination</label>
-            <input type="text" name="target_hub" placeholder="e.g., Chegutu Hub" required>
-            
+            <label>Buyer Account Name</label>
+            <input type="text" name="buyer_name" required>
+            <label>Phone Number</label>
+            <input type="tel" name="phone" required>
+            <label>Delivery Destination</label>
+            <input type="text" name="target_hub" required>
             <label>Target Commodities Seeking</label>
-            <input type="text" name="crop_needed" placeholder="e.g., Onions, Honey, Potatoes" required>
-            
-            <button type="submit">Submit Sourcing Target</button>
+            <input type="text" name="crop_needed" required>
+            <button type="submit" style="background: var(--buyer-color);">Submit Sourcing Target</button>
         </form>
     </div>
 </body>
@@ -304,16 +200,13 @@ BUYER_FORM_HTML = f"""
 """
 
 @app.route('/register')
-def serve_farmer_form():
-    return render_template_string(FARMER_FORM_HTML)
+def serve_farmer_form(): return render_template_string(FARMER_FORM_HTML)
 
 @app.route('/register_driver')
-def serve_driver_form():
-    return render_template_string(DRIVER_FORM_HTML)
+def serve_driver_form(): return render_template_string(DRIVER_FORM_HTML)
 
 @app.route('/register_buyer')
-def serve_buyer_form():
-    return render_template_string(BUYER_FORM_HTML)
+def serve_buyer_form(): return render_template_string(BUYER_FORM_HTML)
 
 @app.route('/api/list_harvest', methods=['POST'])
 def api_list_harvest():
@@ -322,18 +215,18 @@ def api_list_harvest():
         hub = request.form.get('hub')
         crop = request.form.get('crop')
         quantity = request.form.get('quantity')
-        unit = request.form.get('unit')
         details = request.form.get('details', '')
-        quantity_str = f"{quantity} {unit}"
         
-        photo_path = ""
-        if 'produce_photo' in request.files:
-            file = request.files['produce_photo']
+        saved_paths = []
+        files = request.files.getlist('produce_photos') # Grab list of multiple photos
+        for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                unique_filename = f"harvest_{farm_name.replace(' ', '_')}_{filename}"
+                unique_filename = f"harvest_{farm_name.replace(' ', '_')}_{idx}_{filename}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                photo_path = f"/uploads/{unique_filename}"
+                saved_paths.append(f"/uploads/{unique_filename}")
+                
+        photo_paths_str = ",".join(saved_paths)
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
@@ -343,17 +236,14 @@ def api_list_harvest():
                 farm_name TEXT, hub TEXT, crop TEXT, quantity TEXT, details TEXT, photo_path TEXT
             )
         ''')
-        # Simple schema patch if table exists without column
-        try:
-            cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
-        except sqlite3.OperationalError:
-            pass
+        try: cursor.execute('ALTER TABLE harvest ADD COLUMN photo_path TEXT')
+        except sqlite3.OperationalError: pass
             
         cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path) VALUES (?, ?, ?, ?, ?, ?)',
-                       (farm_name, hub, crop, quantity_str, details, photo_path))
+                       (farm_name, hub, crop, quantity, details, photo_paths_str))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Harvest with photo listed successfully!"}), 201
+        return jsonify({"status": "success", "message": f"Successfully listed harvest with {len(saved_paths)} images!"}), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -365,15 +255,17 @@ def api_register_driver():
         vehicle_type = request.form.get('vehicle_type')
         base_hub = request.form.get('base_hub')
         
-        photo_path = ""
-        if 'vehicle_photo' in request.files:
-            file = request.files['vehicle_photo']
+        saved_paths = []
+        files = request.files.getlist('vehicle_photos')
+        for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                unique_filename = f"driver_{driver_name.replace(' ', '_')}_{filename}"
+                unique_filename = f"driver_{driver_name.replace(' ', '_')}_{idx}_{filename}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                photo_path = f"/uploads/{unique_filename}"
+                saved_paths.append(f"/uploads/{unique_filename}")
                 
+        photo_paths_str = ",".join(saved_paths)
+        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('''
@@ -382,16 +274,14 @@ def api_register_driver():
                 driver_name TEXT, phone TEXT, vehicle_type TEXT, base_hub TEXT, photo_path TEXT
             )
         ''')
-        try:
-            cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
-        except sqlite3.OperationalError:
-            pass
+        try: cursor.execute('ALTER TABLE drivers ADD COLUMN photo_path TEXT')
+        except sqlite3.OperationalError: pass
             
         cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path) VALUES (?, ?, ?, ?, ?)',
-                       (driver_name, phone, vehicle_type, base_hub, photo_path))
+                       (driver_name, phone, vehicle_type, base_hub, photo_paths_str))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Transporter registered with vehicle file successfully!"}), 201
+        return jsonify({"status": "success", "message": f"Driver profile loaded with {len(saved_paths)} truck files!"}), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -402,22 +292,13 @@ def api_register_buyer():
         phone = request.form.get('phone')
         target_hub = request.form.get('target_hub')
         crop_needed = request.form.get('crop_needed')
-        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS buyers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                buyer_name TEXT, phone TEXT, target_hub TEXT, crop_needed TEXT
-            )
-        ''')
-        cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)',
-                       (buyer_name, phone, target_hub, crop_needed))
+        cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed) VALUES (?, ?, ?, ?)', (buyer_name, phone, target_hub, crop_needed))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "Buyer registration saved successfully!"}), 201
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "success", "message": "Buyer added!"}), 201
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)

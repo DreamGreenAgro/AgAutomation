@@ -564,7 +564,7 @@ def dashboard():
     role_section = ''
     header_actions = ''
     if logged_in:
-        header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a>'
+        header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a><div style="margin-top: 15px;"><a href="/feedback" style="color: #2e7d32; text-decoration: none; font-weight: bold; display: inline-block; padding: 10px 15px; background: rgba(46, 125, 50, 0.1); border-radius: 4px;">💬 Share System Feedback</a></div>'
         if role == 'farmer':
             farmer_harvests = cursor.execute('SELECT * FROM harvest WHERE user_id = ?', (current_user['id'],)).fetchall()
             harvest_cards = ''
@@ -607,7 +607,7 @@ def dashboard():
                 </div>
             '''
         elif role == 'buyer':
-            header_actions = f'<a href="/matches" class="helper-link" style="background: var(--primary);">View Matches</a><a href="/logout" style="background:#e65100;">Logout</a>'
+            header_actions = f'<a href="/matches" class="helper-link" style="background: var(--primary);">View Matches</a><a href="/logout" style="background:#e65100;">Logout</a><div style="margin-top: 15px;"><a href="/feedback" style="color: #2e7d32; text-decoration: none; font-weight: bold; display: inline-block; padding: 10px 15px; background: rgba(46, 125, 50, 0.1); border-radius: 4px;">💬 Share System Feedback</a></div>'
             buyer_profile = cursor.execute('SELECT * FROM buyers WHERE user_id = ?', (current_user['id'],)).fetchone()
             buyer_name = buyer_profile['buyer_name'] if buyer_profile else ''
             phone = buyer_profile['phone'] if buyer_profile else ''
@@ -635,7 +635,7 @@ def dashboard():
                 </div>
             '''
         elif role == 'driver':
-            header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a>'
+            header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a><div style="margin-top: 15px;"><a href="/feedback" style="color: #2e7d32; text-decoration: none; font-weight: bold; display: inline-block; padding: 10px 15px; background: rgba(46, 125, 50, 0.1); border-radius: 4px;">💬 Share System Feedback</a></div>'
             driver_profile = cursor.execute('SELECT * FROM drivers WHERE user_id = ?', (current_user['id'],)).fetchone()
             if driver_profile:
                 role_section = f'''
@@ -658,7 +658,7 @@ def dashboard():
                     <a href="/register_driver" class="helper-link" style="background: var(--driver-color);">Register Driver Profile</a>
                 '''
         else:
-            header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a>'
+            header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a><div style="margin-top: 15px;"><a href="/feedback" style="color: #2e7d32; text-decoration: none; font-weight: bold; display: inline-block; padding: 10px 15px; background: rgba(46, 125, 50, 0.1); border-radius: 4px;">💬 Share System Feedback</a></div>'
             role_section = f'''
                 <h3>👤 General Dashboard</h3>
                 <p style="color:#37474f;">Welcome to your account dashboard. Use the actions above to interact with the marketplace.</p>
@@ -1031,75 +1031,46 @@ def api_register_buyer():
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 
-    # Feedback routes
-    @app.route('/feedback')
-    def feedback_page():
-        current_user = get_current_user()
-        if not current_user:
-            return redirect('/login')
-        return render_template('feedback.html', active_page='feedback', username=current_user['username'])
+@app.route('/feedback')
+def feedback_page():
+    if 'user_id' not in session:
+        return redirect('/login')
+    return render_template('feedback.html', active_page='feedback')
 
 
-    @app.route('/submit-feedback', methods=['POST'])
-    def submit_feedback():
-        current_user = get_current_user()
-        if not current_user:
-            return redirect('/login')
-        feedback_text = request.form.get('feedback_text', '').strip()
-        if not feedback_text:
-            return redirect('/feedback?status=empty')
-        user_id = session.get('user_id')
-        role = session.get('role', current_user['role'])
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO feedback (user_id, role, message) VALUES (?, ?, ?)', (user_id, role, feedback_text))
-        conn.commit()
-        conn.close()
-        return redirect('/feedback?status=success')
+@app.route('/submit-feedback', methods=['POST'])
+def submit_feedback():
+    if 'user_id' not in session:
+        return jsonify({"status": "error", "message": "Login required"}), 401
+    feedback_text = request.form.get('feedback_text')
+    if not feedback_text:
+        return redirect('/feedback?status=empty')
+    conn = sqlite3.connect('market.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO feedback (user_id, role, message) VALUES (?, ?, ?)",
+                   (session['user_id'], session.get('role', 'unknown'), feedback_text))
+    conn.commit()
+    conn.close()
+    return redirect('/feedback?status=success')
 
 
-    @app.route('/dream-admin-feedback')
-    def dream_admin_feedback():
-        # Strict admin-only access: user id must be 1
-        if session.get('user_id') != 1:
-            return "Forbidden", 403
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        rows = cursor.execute('SELECT * FROM feedback ORDER BY timestamp DESC').fetchall()
-        conn.close()
-
-        items_html = ''
-        for r in rows:
-            items_html += f'''<div style="background:#0f1720;color:#e6eef6;padding:16px;border-radius:12px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.04);">
-                <div style="font-weight:700;color:#cdeac0;">{r['role'] or 'user'} — ID:{r['user_id']}</div>
-                <div style="color:#9fb7a1;margin-top:6px;">{r['message']}</div>
-                <div style="font-size:0.85rem;color:#8aa398;margin-top:8px;">{r['timestamp']}</div>
-            </div>'''
-
-        ADMIN_HTML = f'''
-        <!DOCTYPE html>
-        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Admin Feedback - Dream Green Agro</title>
-        <style>
-          body {{ background: #071018; color: #e6eef6; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding:30px; }}
-          .container {{ max-width:1000px;margin:auto; }}
-          h1 {{ color: #bde3b8; }}
-          .cards {{ margin-top:18px; }}
-          a.back {{ color: #9fd08f; text-decoration:none; display:inline-block; margin-bottom:12px; }}
-        </style>
-        </head><body>
-          <div class="container">
-            <a class="back" href="/dashboard">← Back to Dashboard</a>
-            <h1>Feedback Center</h1>
-            <p style="color:#9fb7a1;">All user feedback (most recent first).</p>
-            <div class="cards">
-              {items_html}
-            </div>
-          </div>
-        </body></html>
-        '''
-        return render_template_string(ADMIN_HTML)
-
-if __name__ == '__main__':
+@app.route('/dream-admin-feedback')
+def view_feedback():
+    if 'user_id' not in session:
+        return redirect('/login')
+    conn = sqlite3.connect('market.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT role, timestamp, message, user_id FROM feedback ORDER BY timestamp DESC")
+    all_feedback = cursor.fetchall()
+    conn.close()
+    
+    html_template = """
+    <!DOCTYPE html>
+    <html><head><title>Admin Panel</title><style>body{background:#121815;color:#fff;padding:20px;font-family:sans-serif;}.card{background:rgba(255,255,255,0.05);padding:15px;margin-bottom:10px;border-left:4px solid #2e7d32;}.card p{margin:8px 0 0 0;color:#ccc;}</style></head>
+    <body><h2>Incoming Feedback</h2>
+    {% for item in feedback_list %}<div class="card"><strong>Role:</strong> {{item[0]}} | <strong>User ID:</strong> {{item[3]}}<p>"{{item[2]}}"</p></div>{% endfor %}
+    </body></html>
+    """
+    from flask import render_template_string
+    return render_template_string(html_template, feedback_list=all_feedback)
     app.run(host='0.0.0.0', port=10000)

@@ -508,113 +508,163 @@ BUYER_FORM_HTML = f"""
 @app.route('/dashboard')
 def dashboard():
     current_user = get_current_user()
-    if not current_user:
-        return redirect('/login')
-
-    role = (current_user['role'] or 'user').lower()
-    username = current_user['username']
+    logged_in = current_user is not None
+    username = current_user['username'] if logged_in else 'Guest'
+    role = (current_user['role'] or 'user').lower() if logged_in else 'guest'
 
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
+    harvests = cursor.execute("SELECT * FROM harvest").fetchall()
+    drivers = cursor.execute("SELECT * FROM drivers").fetchall()
 
-    role_section = ''
-    if role == 'farmer':
-        farmer_harvests = cursor.execute('SELECT * FROM harvest WHERE user_id = ?', (current_user['id'],)).fetchall()
-        harvest_cards = ''
-        if farmer_harvests:
-            for row in farmer_harvests:
-                harvest_cards += f'''
-                    <div class="market-card">
-                        <img class="card-img" src="{row['photo_path'] if row['photo_path'] else '/static/logo.webp'}" alt="Produce" onerror="this.src='/static/logo.webp';">
-                        <div class="card-body">
-                            <span class="badge" style="background: var(--primary);">{row['crop']}</span>
-                            <div class="card-title">{row['farm_name']} — {row['hub']}</div>
-                            <div class="card-meta">📦 {row['quantity']}</div>
-                            <p style="font-size: 0.85rem; color: #555; margin: 0;">{row['details']}</p>
-                            <a href="/api/delete/harvest/{row['id']}" class="back-btn" style="display:inline-block;margin-top:14px;background:#d32f2f;color:#fff;">🗑️ Delete Listing</a>
-                        </div>
-                    </div>
-                '''
-        else:
-            harvest_cards = '<p style="color:#37474f;">You have no crop listings yet.</p>'
-
-        role_section = f'''
-            <h3>🧑‍🌾 Your Harvest Listings</h3>
-            <div class="market-grid">{harvest_cards}</div>
-            <h3>📤 List a New Harvest</h3>
-            <div class="form-container" style="background:#fff; padding:20px; box-shadow:none; border:none;">
-                <form action="/api/list_harvest" method="POST" enctype="multipart/form-data">
-                    <label>Farm / Seller Identity</label>
-                    <input type="text" name="farm_name" placeholder="e.g., Green Valley Estates" required>
-                    <label>Nearest Local Delivery Hub / City</label>
-                    <input type="text" name="hub" placeholder="e.g., Chegutu" required>
-                    <label>Crop / Produce Type</label>
-                    <input type="text" name="crop" placeholder="e.g., Butternut, Tomatoes, White Maize" required>
-                    <div style="display:flex; gap:10px;"><div style="flex:2;"><label>Quantity</label></div><div style="flex:1;"><label>Metric Unit</label></div></div>
-                    <div style="display:flex; gap:10px;"><input type="number" step="any" name="quantity" placeholder="500" required><select name="unit"><option value="KG">KG</option><option value="Tons">Tons</option><option value="Bags (50kg)">Bags (50kg)</option><option value="Crates">Crates</option><option value="Litres">Litres</option></select></div>
-                    <label>Upload Produce Photo</label>
-                    <input type="file" name="produce_photo" accept="image/*" required>
-                    <label>Batch Details or Quality Grade (Optional)</label>
-                    <textarea name="details" rows="2" placeholder="e.g., Grade A premium quality, washed..."></textarea>
-                    <button type="submit" style="background: var(--primary);">Publish Produce Listing</button>
-                </form>
-            </div>
-        '''
-    elif role == 'buyer':
-        buyer_profile = cursor.execute('SELECT * FROM buyers WHERE user_id = ?', (current_user['id'],)).fetchone()
-        buyer_name = buyer_profile['buyer_name'] if buyer_profile else ''
-        phone = buyer_profile['phone'] if buyer_profile else ''
-        target_hub = buyer_profile['target_hub'] if buyer_profile else ''
-        crop_needed = buyer_profile['crop_needed'] if buyer_profile else ''
-        profile_message = 'Update your sourcing requirements below.' if buyer_profile else 'Tell us what crops and hubs you are looking for.'
-
-        role_section = f'''
-            <h3>🛒 Buyer Sourcing Profile</h3>
-            <div class="summary-box" style="margin-bottom:24px;">
-                <p style="margin:0;"><strong>{profile_message}</strong></p>
-                <p style="margin:8px 0 0 0;">Current buyer account: <strong>{buyer_name or username}</strong></p>
-            </div>
-            <div class="form-container" style="background:#fff; padding:20px; box-shadow:none; border:none;">
-                <form action="/api/register_buyer" method="POST">
-                    <label>Buyer / Procurement Account Name</label>
-                    <input type="text" name="buyer_name" value="{buyer_name}" placeholder="e.g., Fresh Choice Markets" required>
-                    <label>Procurement Team Phone Number</label>
-                    <input type="tel" name="phone" value="{phone}" placeholder="e.g., +263..." required>
-                    <label>Intended Sourcing Delivery Destination</label>
-                    <input type="text" name="target_hub" value="{target_hub}" placeholder="e.g., Chegutu Hub" required>
-                    <label>Target Commodities Seeking</label>
-                    <input type="text" name="crop_needed" value="{crop_needed}" placeholder="e.g., Onions, Honey, Potatoes" required>
-                    <button type="submit" style="background: var(--buyer-color);">Save Sourcing Preferences</button>
-                </form>
-            </div>
-        '''
-    elif role == 'driver':
-        driver_profile = cursor.execute('SELECT * FROM drivers WHERE user_id = ?', (current_user['id'],)).fetchone()
-        if driver_profile:
-            role_section = f'''
-                <h3>🚛 Your Logistics Hub</h3>
-                <div class="market-card" style="padding:18px; border:none; box-shadow:0 10px 20px rgba(0,0,0,0.05);">
+    fetch_all_harvest_cards = ''
+    if harvests:
+        for row in harvests:
+            fetch_all_harvest_cards += f'''
+                <div class="market-card">
+                    <img class="card-img" src="{row['photo_path'] if row['photo_path'] else '/static/logo.webp'}" alt="Produce" onerror="this.src='/static/logo.webp';">
                     <div class="card-body">
-                        <div class="card-title">{driver_profile['driver_name']}</div>
-                        <div class="card-meta">📍 Base hub: {driver_profile['base_hub']}</div>
-                        <div class="card-meta">🚚 Vehicle: {driver_profile['vehicle_type']}</div>
-                        <div class="card-meta">📞 Contact: {driver_profile['phone']}</div>
+                        <span class="badge" style="background: var(--primary);">{row['crop']}</span>
+                        <div class="card-title">{row['farm_name']} — {row['hub']}</div>
+                        <div class="card-meta">📦 {row['quantity']}</div>
+                        <p style="font-size: 0.85rem; color: #555; margin: 0;">{row['details']}</p>
                     </div>
                 </div>
-                <h3>📡 Logistics Network</h3>
-                <p style="color:#37474f;">Your hub has been matched to available harvest listings and transport requests in the same region.</p>
-            '''
-        else:
-            role_section = f'''
-                <h3>🚛 Logistics Hub Setup</h3>
-                <p style="color:#37474f;">You have not yet registered a driver profile. Please register to manage your hub and vehicle details.</p>
-                <a href="/register_driver" class="helper-link" style="background: var(--driver-color);">Register Driver Profile</a>
             '''
     else:
+        fetch_all_harvest_cards = '<p style="color:#37474f;">No harvest listings are available yet.</p>'
+
+    fetch_all_driver_cards = ''
+    if drivers:
+        for row in drivers:
+            fetch_all_driver_cards += f'''
+                <div class="market-card">
+                    <img class="card-img" src="{row['photo_path'] if row['photo_path'] else '/static/logo.webp'}" alt="Vehicle" onerror="this.src='/static/logo.webp';">
+                    <div class="card-body">
+                        <span class="badge" style="background: var(--driver-color);">{row['vehicle_type']}</span>
+                        <div class="card-title">{row['driver_name']}</div>
+                        <div class="card-meta">📞 Contact: {row['phone']}</div>
+                        <div class="card-meta" style="margin: 0; font-weight: 600;">📍 Operational Hub: {row['base_hub']}</div>
+                    </div>
+                </div>
+            '''
+    else:
+        fetch_all_driver_cards = '<p style="color:#37474f;">No transport providers are registered yet.</p>'
+
+    role_section = ''
+    header_actions = ''
+    if logged_in:
+        header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a>'
+        if role == 'farmer':
+            farmer_harvests = cursor.execute('SELECT * FROM harvest WHERE user_id = ?', (current_user['id'],)).fetchall()
+            harvest_cards = ''
+            if farmer_harvests:
+                for row in farmer_harvests:
+                    harvest_cards += f'''
+                        <div class="market-card">
+                            <img class="card-img" src="{row['photo_path'] if row['photo_path'] else '/static/logo.webp'}" alt="Produce" onerror="this.src='/static/logo.webp';">
+                            <div class="card-body">
+                                <span class="badge" style="background: var(--primary);">{row['crop']}</span>
+                                <div class="card-title">{row['farm_name']} — {row['hub']}</div>
+                                <div class="card-meta">📦 {row['quantity']}</div>
+                                <p style="font-size: 0.85rem; color: #555; margin: 0;">{row['details']}</p>
+                                <a href="/api/delete/harvest/{row['id']}" class="back-btn" style="display:inline-block;margin-top:14px;background:#d32f2f;color:#fff;">🗑️ Delete Listing</a>
+                            </div>
+                        </div>
+                    '''
+            if not harvest_cards:
+                harvest_cards = '<p style="color:#37474f;">You have no crop listings yet.</p>'
+            role_section = f'''
+                <h3>🧑‍🌾 Your Harvest Listings</h3>
+                <div class="market-grid">{harvest_cards}</div>
+                <h3>📤 List a New Harvest</h3>
+                <div class="form-container" style="background:#fff; padding:20px; box-shadow:none; border:none;">
+                    <form action="/api/list_harvest" method="POST" enctype="multipart/form-data">
+                        <label>Farm / Seller Identity</label>
+                        <input type="text" name="farm_name" placeholder="e.g., Green Valley Estates" required>
+                        <label>Nearest Local Delivery Hub / City</label>
+                        <input type="text" name="hub" placeholder="e.g., Chegutu" required>
+                        <label>Crop / Produce Type</label>
+                        <input type="text" name="crop" placeholder="e.g., Butternut, Tomatoes, White Maize" required>
+                        <div style="display:flex; gap:10px;"><div style="flex:2;"><label>Quantity</label></div><div style="flex:1;"><label>Metric Unit</label></div></div>
+                        <div style="display:flex; gap:10px;"><input type="number" step="any" name="quantity" placeholder="500" required><select name="unit"><option value="KG">KG</option><option value="Tons">Tons</option><option value="Bags (50kg)">Bags (50kg)</option><option value="Crates">Crates</option><option value="Litres">Litres</option></select></div>
+                        <label>Upload Produce Photo</label>
+                        <input type="file" name="produce_photo" accept="image/*" required>
+                        <label>Batch Details or Quality Grade (Optional)</label>
+                        <textarea name="details" rows="2" placeholder="e.g., Grade A premium quality, washed..."></textarea>
+                        <button type="submit" style="background: var(--primary);">Publish Produce Listing</button>
+                    </form>
+                </div>
+            '''
+        elif role == 'buyer':
+            header_actions = f'<a href="/matches" class="helper-link" style="background: var(--primary);">View Matches</a><a href="/logout" style="background:#e65100;">Logout</a>'
+            buyer_profile = cursor.execute('SELECT * FROM buyers WHERE user_id = ?', (current_user['id'],)).fetchone()
+            buyer_name = buyer_profile['buyer_name'] if buyer_profile else ''
+            phone = buyer_profile['phone'] if buyer_profile else ''
+            target_hub = buyer_profile['target_hub'] if buyer_profile else ''
+            crop_needed = buyer_profile['crop_needed'] if buyer_profile else ''
+            profile_message = 'Update your sourcing requirements below.' if buyer_profile else 'Tell us what crops and hubs you are looking for.'
+            role_section = f'''
+                <h3>🛒 Buyer Sourcing Profile</h3>
+                <div class="summary-box" style="margin-bottom:24px;">
+                    <p style="margin:0;"><strong>{profile_message}</strong></p>
+                    <p style="margin:8px 0 0 0;">Current buyer account: <strong>{buyer_name or username}</strong></p>
+                </div>
+                <div class="form-container" style="background:#fff; padding:20px; box-shadow:none; border:none;">
+                    <form action="/api/register_buyer" method="POST">
+                        <label>Buyer / Procurement Account Name</label>
+                        <input type="text" name="buyer_name" value="{buyer_name}" placeholder="e.g., Fresh Choice Markets" required>
+                        <label>Procurement Team Phone Number</label>
+                        <input type="tel" name="phone" value="{phone}" placeholder="e.g., +263..." required>
+                        <label>Intended Sourcing Delivery Destination</label>
+                        <input type="text" name="target_hub" value="{target_hub}" placeholder="e.g., Chegutu Hub" required>
+                        <label>Target Commodities Seeking</label>
+                        <input type="text" name="crop_needed" value="{crop_needed}" placeholder="e.g., Onions, Honey, Potatoes" required>
+                        <button type="submit" style="background: var(--buyer-color);">Save Sourcing Preferences</button>
+                    </form>
+                </div>
+            '''
+        elif role == 'driver':
+            header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a>'
+            driver_profile = cursor.execute('SELECT * FROM drivers WHERE user_id = ?', (current_user['id'],)).fetchone()
+            if driver_profile:
+                role_section = f'''
+                    <h3>🚛 Your Logistics Hub</h3>
+                    <div class="market-card" style="padding:18px; border:none; box-shadow:0 10px 20px rgba(0,0,0,0.05);">
+                        <div class="card-body">
+                            <div class="card-title">{driver_profile['driver_name']}</div>
+                            <div class="card-meta">📍 Base hub: {driver_profile['base_hub']}</div>
+                            <div class="card-meta">🚚 Vehicle: {driver_profile['vehicle_type']}</div>
+                            <div class="card-meta">📞 Contact: {driver_profile['phone']}</div>
+                        </div>
+                    </div>
+                    <h3>📡 Logistics Network</h3>
+                    <p style="color:#37474f;">Your hub has been matched to available harvest listings and transport requests in the same region.</p>
+                '''
+            else:
+                role_section = f'''
+                    <h3>🚛 Logistics Hub Setup</h3>
+                    <p style="color:#37474f;">You have not yet registered a driver profile. Please register to manage your hub and vehicle details.</p>
+                    <a href="/register_driver" class="helper-link" style="background: var(--driver-color);">Register Driver Profile</a>
+                '''
+        else:
+            header_actions = f'<a href="/logout" style="background:#e65100;">Logout</a>'
+            role_section = f'''
+                <h3>👤 General Dashboard</h3>
+                <p style="color:#37474f;">Welcome to your account dashboard. Use the actions above to interact with the marketplace.</p>
+            '''
+    else:
+        header_actions = '<a href="/login" class="helper-link" style="background: var(--primary);">Login</a><a href="/signup" class="helper-link" style="background: var(--buyer-color);">Sign Up</a>'
         role_section = f'''
-            <h3>👤 General Dashboard</h3>
-            <p style="color:#37474f;">Welcome to your account dashboard. Use the actions above to interact with the marketplace.</p>
+            <div class="summary-box" style="margin-bottom:24px;">
+                <h3>👋 Welcome Guest</h3>
+                <p style="margin: 8px 0 0 0; color:#37474f;">You may browse all active listings here. Log in or create an account to sell, buy or register transport.</p>
+                <div style="margin-top: 14px; display:flex; gap:12px; flex-wrap:wrap;">
+                    <a href="/login" class="helper-link" style="background: var(--primary);">Login</a>
+                    <a href="/signup" class="helper-link" style="background: var(--buyer-color);">Sign Up</a>
+                </div>
+            </div>
         '''
 
     conn.close()
@@ -624,14 +674,14 @@ def dashboard():
     <html lang="en">
     <head>
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Ecosystem Dashboard - Dream Green Agro</title>
+        <title>Marketplace Feed - Dream Green Agro</title>
         {COMMON_STYLE}
         <style>
             body {{ display: block; padding: 40px 15px; }}
             .dashboard-container {{ max-width: 1100px; margin: auto; }}
             h3 {{ color: var(--text); border-bottom: 2px solid #cfd8dc; padding-bottom: 8px; margin-top: 30px; }}
             .header-actions {{ display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }}
-            .header-actions a {{ text-decoration:none; color:#fff; padding:10px 16px; border-radius:10px; background:#2e7d32; font-weight:700; }}
+            .header-actions a {{ text-decoration:none; color:#fff; padding:10px 16px; border-radius:10px; font-weight:700; }}
             .summary-box {{ background: #f4f8fb; border: 1px solid #cfd8dc; border-radius: 16px; padding: 18px; margin-bottom: 24px; }}
             .helper-link {{ display: inline-block; padding: 10px 16px; border-radius: 10px; color: #fff; text-decoration: none; }}
         </style>
@@ -645,19 +695,22 @@ def dashboard():
                 </div>
                 <div>
                     <h1 class="brand-title" style="font-size: 1.6rem;">Dream Green Agro</h1>
-                    <p class="brand-subtitle">Welcome back, {username} ({current_user['role'].title()})</p>
+                    <p class="brand-subtitle">{ 'Welcome back, ' + username.title() if logged_in else 'Public Market Feed' }</p>
                     <div class="header-actions">
-                        <span style="font-weight:700;color:#37474f;">Role: {current_user['role'].title()}</span>
-                        <a href="/logout" style="background:#e65100;">Logout</a>
+                        {header_actions}
                     </div>
                 </div>
             </div>
             {role_section}
+            <h3>🧑‍🌾 Active Crop Harvest Offers</h3>
+            <div class="market-grid">{fetch_all_harvest_cards}</div>
+            <h3>🚛 Logistical Transit Fleets</h3>
+            <div class="market-grid">{fetch_all_driver_cards}</div>
         </div>
     </body>
     </html>
     """
-    return render_template_string(DASHBOARD_HTML)
+    return render_template_string(DASHBOARD_HTML, logged_in=logged_in)
 
 # Auth routes
 @app.route('/login', methods=['GET', 'POST'])

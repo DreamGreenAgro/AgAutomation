@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from datetime import timedelta
-from flask import Flask, jsonify, request, redirect, render_template_string, send_from_directory, session
+from flask import Flask, jsonify, request, redirect, render_template, render_template_string, send_from_directory, session, abort
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 # Fail fast if SECRET_KEY is not provided — prevents forging sessions in production
@@ -155,6 +155,15 @@ def init_db_fresh():
             target_hub TEXT,
             crop_needed TEXT,
             user_id INTEGER
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            role TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     conn.commit()
@@ -1020,6 +1029,77 @@ def api_register_buyer():
         conn.close()
         return redirect('/matches')
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+
+
+    # Feedback routes
+    @app.route('/feedback')
+    def feedback_page():
+        current_user = get_current_user()
+        if not current_user:
+            return redirect('/login')
+        return render_template('feedback.html', active_page='feedback', username=current_user['username'])
+
+
+    @app.route('/submit-feedback', methods=['POST'])
+    def submit_feedback():
+        current_user = get_current_user()
+        if not current_user:
+            return redirect('/login')
+        feedback_text = request.form.get('feedback_text', '').strip()
+        if not feedback_text:
+            return redirect('/feedback?status=empty')
+        user_id = session.get('user_id')
+        role = session.get('role', current_user['role'])
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO feedback (user_id, role, message) VALUES (?, ?, ?)', (user_id, role, feedback_text))
+        conn.commit()
+        conn.close()
+        return redirect('/feedback?status=success')
+
+
+    @app.route('/dream-admin-feedback')
+    def dream_admin_feedback():
+        # Strict admin-only access: user id must be 1
+        if session.get('user_id') != 1:
+            return "Forbidden", 403
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        rows = cursor.execute('SELECT * FROM feedback ORDER BY timestamp DESC').fetchall()
+        conn.close()
+
+        items_html = ''
+        for r in rows:
+            items_html += f'''<div style="background:#0f1720;color:#e6eef6;padding:16px;border-radius:12px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.04);">
+                <div style="font-weight:700;color:#cdeac0;">{r['role'] or 'user'} — ID:{r['user_id']}</div>
+                <div style="color:#9fb7a1;margin-top:6px;">{r['message']}</div>
+                <div style="font-size:0.85rem;color:#8aa398;margin-top:8px;">{r['timestamp']}</div>
+            </div>'''
+
+        ADMIN_HTML = f'''
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Admin Feedback - Dream Green Agro</title>
+        <style>
+          body {{ background: #071018; color: #e6eef6; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding:30px; }}
+          .container {{ max-width:1000px;margin:auto; }}
+          h1 {{ color: #bde3b8; }}
+          .cards {{ margin-top:18px; }}
+          a.back {{ color: #9fd08f; text-decoration:none; display:inline-block; margin-bottom:12px; }}
+        </style>
+        </head><body>
+          <div class="container">
+            <a class="back" href="/dashboard">← Back to Dashboard</a>
+            <h1>Feedback Center</h1>
+            <p style="color:#9fb7a1;">All user feedback (most recent first).</p>
+            <div class="cards">
+              {items_html}
+            </div>
+          </div>
+        </body></html>
+        '''
+        return render_template_string(ADMIN_HTML)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)

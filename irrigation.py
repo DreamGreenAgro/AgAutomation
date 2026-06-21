@@ -3,9 +3,13 @@ import os
 from datetime import timedelta
 from flask import Flask, jsonify, request, redirect, render_template_string, send_from_directory, session
 from werkzeug.utils import secure_filename
-
+from werkzeug.security import generate_password_hash, check_password_hash
+# Fail fast if SECRET_KEY is not provided — prevents forging sessions in production
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    raise RuntimeError("SECRET_KEY environment variable is required. Set it before starting the application.")
 app = Flask(__name__, static_folder='static')
-app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret')
+app.secret_key = _secret_key
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 DB_NAME = "market.db"
 
@@ -616,7 +620,7 @@ def login():
         cursor = conn.cursor()
         user = cursor.execute('SELECT id, username, password FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
-        if user and user['password'] == password:
+        if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session.permanent = True
             return redirect('/dashboard')
@@ -634,7 +638,7 @@ def signup():
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         try:
-            cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, password, role))
+            cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, generate_password_hash(password), role))
             conn.commit()
             user_id = cursor.lastrowid
             session['user_id'] = user_id
@@ -857,25 +861,32 @@ def api_register_driver():
         return redirect('/dashboard')
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/delete/<type>/<int:item_id>')
-def api_delete(type, item_id):
+@app.route('/api/delete/harvest/<int:item_id>')
+def api_delete_harvest(item_id):
     current_user = get_current_user()
     if not current_user:
         return redirect('/login')
-
-    if type == 'harvest':
-        table = 'harvest'
-    elif type in ('driver', 'drivers'):
-        table = 'drivers'
-    else:
-        return redirect('/dashboard')
-
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    item = cursor.execute(f'SELECT user_id FROM {table} WHERE id = ?', (item_id,)).fetchone()
+    item = cursor.execute('SELECT user_id FROM harvest WHERE id = ?', (item_id,)).fetchone()
     if item and item['user_id'] == current_user['id']:
-        cursor.execute(f'DELETE FROM {table} WHERE id = ?', (item_id,))
+        cursor.execute('DELETE FROM harvest WHERE id = ?', (item_id,))
+        conn.commit()
+    conn.close()
+    return redirect('/dashboard')
+
+@app.route('/api/delete/drivers/<int:item_id>')
+def api_delete_driver(item_id):
+    current_user = get_current_user()
+    if not current_user:
+        return redirect('/login')
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    item = cursor.execute('SELECT user_id FROM drivers WHERE id = ?', (item_id,)).fetchone()
+    if item and item['user_id'] == current_user['id']:
+        cursor.execute('DELETE FROM drivers WHERE id = ?', (item_id,))
         conn.commit()
     conn.close()
     return redirect('/dashboard')

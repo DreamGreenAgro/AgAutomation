@@ -1,10 +1,12 @@
 import sqlite3
 import os
+from datetime import timedelta
 from flask import Flask, jsonify, request, redirect, render_template_string, send_from_directory, session
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 DB_NAME = "market.db"
 
 # Global CSS Framework
@@ -616,8 +618,11 @@ def login():
         conn.close()
         if user and user['password'] == password:
             session['user_id'] = user['id']
+            session.permanent = True
             return redirect('/dashboard')
         return render_template_string(LOGIN_HTML.replace('🔐 Sign In', '🔐 Sign In - Invalid credentials'))
+    if session.get('user_id'):
+        return redirect('/dashboard')
     return render_template_string(LOGIN_HTML)
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -633,11 +638,14 @@ def signup():
             conn.commit()
             user_id = cursor.lastrowid
             session['user_id'] = user_id
+            session.permanent = True
             return redirect('/dashboard')
         except sqlite3.IntegrityError:
             return render_template_string(SIGNUP_HTML.replace('📝 Register Account', '📝 Register Account - Username taken'))
         finally:
             conn.close()
+    if session.get('user_id'):
+        return redirect('/dashboard')
     return render_template_string(SIGNUP_HTML)
 
 @app.route('/logout')

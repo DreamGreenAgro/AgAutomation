@@ -187,6 +187,9 @@ def get_current_user():
     cursor = conn.cursor()
     user = cursor.execute('SELECT id, username, role FROM users WHERE id = ?', (user_id,)).fetchone()
     conn.close()
+    if not user:
+        session.pop('user_id', None)
+        return None
     return user
 
 def get_buyer_profile(user_id):
@@ -625,7 +628,8 @@ def login():
             session.permanent = True
             return redirect('/dashboard')
         return render_template_string(LOGIN_HTML.replace('🔐 Sign In', '🔐 Sign In - Invalid credentials'))
-    if session.get('user_id'):
+    current_user = get_current_user()
+    if current_user:
         return redirect('/dashboard')
     return render_template_string(LOGIN_HTML)
 
@@ -648,7 +652,8 @@ def signup():
             return render_template_string(SIGNUP_HTML.replace('📝 Register Account', '📝 Register Account - Username taken'))
         finally:
             conn.close()
-    if session.get('user_id'):
+    current_user = get_current_user()
+    if current_user:
         return redirect('/dashboard')
     return render_template_string(SIGNUP_HTML)
 

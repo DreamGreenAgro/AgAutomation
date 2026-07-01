@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import subprocess
 from datetime import timedelta
 from flask import Flask, jsonify, request, redirect, render_template, render_template_string, send_from_directory, session, abort
 from werkzeug.utils import secure_filename
@@ -183,6 +184,17 @@ def ensure_buyer_user_link():
 # Run the idempotent migration on application startup
 init_db_fresh()
 ensure_buyer_user_link()
+
+def sync_db_to_github():
+    try:
+        repo_dir = os.path.dirname(os.path.abspath(__file__))
+        subprocess.run(["git", "config", "--global", "user.email", "bot@dreamgreen.com"], check=True, cwd=repo_dir)
+        subprocess.run(["git", "config", "--global", "user.name", "Render DB Bot"], check=True, cwd=repo_dir)
+        subprocess.run(["git", "add", "market.db"], check=True, cwd=repo_dir)
+        subprocess.run(["git", "commit", "-m", "data: auto-sync database update [skip ci]"], check=True, cwd=repo_dir)
+        subprocess.run(["git", "push", "origin", "main"], check=True, cwd=repo_dir)
+    except Exception as e:
+        print(f"Git sync failed: {e}")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -944,6 +956,7 @@ def api_list_harvest():
         cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)', (farm_name, hub, crop, quantity_str, details, photo_path, current_user['id']))
         conn.commit()
         conn.close()
+        sync_db_to_github()
         return redirect('/dashboard')
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -972,6 +985,7 @@ def api_register_driver():
         cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?)', (driver_name, phone, vehicle_type, base_hub, photo_path, current_user['id']))
         conn.commit()
         conn.close()
+        sync_db_to_github()
         return redirect('/dashboard')
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -1027,6 +1041,7 @@ def api_register_buyer():
             cursor.execute('INSERT INTO buyers (buyer_name, phone, target_hub, crop_needed, user_id) VALUES (?, ?, ?, ?, ?)', (buyer_name, phone, target_hub, crop_needed, current_user['id']))
         conn.commit()
         conn.close()
+        sync_db_to_github()
         return redirect('/matches')
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -1045,7 +1060,7 @@ def submit_feedback():
     feedback_text = request.form.get('feedback_text')
     if not feedback_text:
         return redirect('/feedback?status=empty')
-    conn = sqlite3.connect('market.db')
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS feedback (
@@ -1060,6 +1075,7 @@ def submit_feedback():
                    (session['user_id'], session.get('role', 'unknown'), feedback_text))
     conn.commit()
     conn.close()
+    sync_db_to_github()
     return redirect('/feedback?status=success')
 
 

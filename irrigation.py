@@ -765,6 +765,7 @@ def signup():
         try:
             cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, generate_password_hash(password), role))
             conn.commit()
+            sync_db_to_github()
             user_id = cursor.lastrowid
             session['user_id'] = user_id
             session.permanent = True

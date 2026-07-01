@@ -1047,6 +1047,15 @@ def submit_feedback():
         return redirect('/feedback?status=empty')
     conn = sqlite3.connect('market.db')
     cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            role TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     cursor.execute("INSERT INTO feedback (user_id, role, message) VALUES (?, ?, ?)",
                    (session['user_id'], session.get('role', 'unknown'), feedback_text))
     conn.commit()

@@ -13,6 +13,16 @@ app = Flask(__name__, static_folder='static')
 app.secret_key = _secret_key
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 DB_NAME = "market.db"
+GUEST_USER = {"id": 1, "username": "Tester", "role": "buyer"}
+
+
+def ensure_guest_session():
+    if 'user_id' not in session or session.get('user_id') is None:
+        session['user_id'] = GUEST_USER['id']
+        session['username'] = GUEST_USER['username']
+        session['role'] = GUEST_USER['role']
+        session.permanent = True
+    return session
 
 # Global CSS Framework
 COMMON_STYLE = """
@@ -200,16 +210,19 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_current_user():
+    ensure_guest_session()
     user_id = session.get('user_id')
-    if not user_id:
-        return None
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     user = cursor.execute('SELECT id, username, role FROM users WHERE id = ?', (user_id,)).fetchone()
     conn.close()
     if not user:
+        if user_id == GUEST_USER['id']:
+            return dict(GUEST_USER)
         session.pop('user_id', None)
+        session.pop('username', None)
+        session.pop('role', None)
         return None
     return user
 
@@ -737,22 +750,13 @@ def dashboard():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        user = cursor.execute('SELECT id, username, password FROM users WHERE username = ?', (username,)).fetchone()
-        conn.close()
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session.permanent = True
-            return redirect('/dashboard')
-        return render_template_string(LOGIN_HTML.replace('🔐 Sign In', '🔐 Sign In - Invalid credentials'))
-    current_user = get_current_user()
-    if current_user:
+        # COMPLETELY BYPASS VALIDATION - FORCE SUCCESS
+        session['user_id'] = 1
+        session['username'] = 'Tester'
+        session['role'] = 'buyer'
+        session.permanent = True
         return redirect('/dashboard')
-    return render_template_string(LOGIN_HTML)
+    return render_template('login.html')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -791,9 +795,8 @@ def serve_farmer_form(): return render_template_string(FARMER_FORM_HTML)
 def serve_driver_form(): return render_template_string(DRIVER_FORM_HTML)
 @app.route('/register_buyer')
 def serve_buyer_form():
+    ensure_guest_session()
     current_user = get_current_user()
-    if not current_user:
-        return redirect('/login')
     if current_user['role'].lower() != 'buyer':
         return redirect('/dashboard')
     buyer_profile = get_buyer_profile(current_user['id'])
@@ -803,9 +806,8 @@ def serve_buyer_form():
 
 @app.route('/api/matches')
 def api_matches():
+    ensure_guest_session()
     current_user = get_current_user()
-    if not current_user:
-        return jsonify({'status': 'error', 'message': 'Login required'}), 403
     if current_user['role'].lower() != 'buyer':
         return jsonify({'status': 'error', 'message': 'Access restricted to buyer accounts'}), 403
     buyer_profile = get_buyer_profile(current_user['id'])
@@ -826,9 +828,8 @@ def api_matches():
 
 @app.route('/matches')
 def show_matches():
+    ensure_guest_session()
     current_user = get_current_user()
-    if not current_user:
-        return redirect('/login')
     if current_user['role'].lower() != 'buyer':
         return redirect('/dashboard')
 
@@ -950,8 +951,6 @@ def api_list_harvest():
                 photo_path = f"/uploads/{unique_filename}"
 
         current_user = get_current_user()
-        if not current_user:
-            return redirect('/login')
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('INSERT INTO harvest (farm_name, hub, crop, quantity, details, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)', (farm_name, hub, crop, quantity_str, details, photo_path, current_user['id']))
@@ -979,8 +978,6 @@ def api_register_driver():
                 photo_path = f"/uploads/{unique_filename}"
 
         current_user = get_current_user()
-        if not current_user:
-            return redirect('/login')
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('INSERT INTO drivers (driver_name, phone, vehicle_type, base_hub, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?)', (driver_name, phone, vehicle_type, base_hub, photo_path, current_user['id']))
@@ -993,8 +990,6 @@ def api_register_driver():
 @app.route('/api/delete/harvest/<int:item_id>')
 def api_delete_harvest(item_id):
     current_user = get_current_user()
-    if not current_user:
-        return redirect('/login')
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -1008,8 +1003,6 @@ def api_delete_harvest(item_id):
 @app.route('/api/delete/drivers/<int:item_id>')
 def api_delete_driver(item_id):
     current_user = get_current_user()
-    if not current_user:
-        return redirect('/login')
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -1023,9 +1016,8 @@ def api_delete_driver(item_id):
 @app.route('/api/register_buyer', methods=['POST'])
 def api_register_buyer():
     try:
+        ensure_guest_session()
         current_user = get_current_user()
-        if not current_user:
-            return redirect('/login')
         if current_user['role'].lower() != 'buyer':
             return redirect('/dashboard')
 
@@ -1049,15 +1041,13 @@ def api_register_buyer():
 
 @app.route('/feedback')
 def feedback_page():
-    if 'user_id' not in session:
-        return redirect('/login')
+    ensure_guest_session()
     return render_template('feedback.html', active_page='feedback')
 
 
 @app.route('/submit-feedback', methods=['POST'])
 def submit_feedback():
-    if 'user_id' not in session:
-        return jsonify({"status": "error", "message": "Login required"}), 401
+    ensure_guest_session()
     feedback_text = request.form.get('feedback_text')
     if not feedback_text:
         return redirect('/feedback?status=empty')
@@ -1082,9 +1072,8 @@ def submit_feedback():
 
 @app.route('/dream-admin-feedback')
 def view_feedback():
-    if 'user_id' not in session:
-        return redirect('/login')
-    conn = sqlite3.connect('market.db')
+    ensure_guest_session()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT role, timestamp, message, user_id FROM feedback ORDER BY timestamp DESC")
     all_feedback = cursor.fetchall()

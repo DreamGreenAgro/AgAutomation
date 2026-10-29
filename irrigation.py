@@ -197,6 +197,17 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS equipment_listings (
+            id INTEGER PRIMARY KEY,
+            equipment_type TEXT,
+            daily_rate REAL,
+            location TEXT,
+            contact TEXT,
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -571,6 +582,7 @@ def dashboard():
     cursor = conn.cursor()
     harvest_offers = cursor.execute("SELECT * FROM harvest_offers ORDER BY created_at DESC").fetchall()
     transport_fleets = cursor.execute("SELECT * FROM transport_fleets ORDER BY created_at DESC").fetchall()
+    equipment_list = cursor.execute("SELECT * FROM equipment_listings ORDER BY created_at DESC").fetchall()
     conn.close()
 
     return render_template(
@@ -580,7 +592,8 @@ def dashboard():
         username=username,
         role=role,
         harvest_offers=harvest_offers,
-        transport_fleets=transport_fleets
+        transport_fleets=transport_fleets,
+        equipment_list=equipment_list
     )
 
 @app.route('/add_harvest', methods=['POST'])
@@ -613,6 +626,25 @@ def add_transport():
     cursor.execute(
         'INSERT INTO transport_fleets (vehicle_type, route, capacity, contact) VALUES (?, ?, ?, ?)',
         (vehicle_type, route, capacity, contact)
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('dashboard'))
+
+@app.route('/add_equipment', methods=['POST'])
+def add_equipment():
+    equipment_type = request.form.get('equipment_type', '').strip()
+    daily_rate = request.form.get('daily_rate', '').strip()
+    location = request.form.get('location', '').strip()
+    contact = request.form.get('contact', '').strip()
+    description = request.form.get('description', '').strip()
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO equipment_listings (equipment_type, daily_rate, location, contact, description) VALUES (?, ?, ?, ?, ?)',
+        (equipment_type, float(daily_rate) if daily_rate else None, location, contact, description)
     )
     conn.commit()
     conn.close()
